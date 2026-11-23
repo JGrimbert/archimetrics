@@ -52,15 +52,16 @@ const SYSTEM = [
 /**
  * Le banc lu depuis `dir` : cas (avec le texte de leur diff, figé ou extrait à la volée ; sinon `indisponible`), dépôts,
  * empreinte. L'empreinte couvre ce qui est montré au modèle et noté (dépôts, cas, attendus, mots-clés, diffs, consigne),
- * pas la forme de `cas.json` ; fins de ligne ramenées à LF (un checkout `core.autocrlf` ne la change pas). Un banc dont un
+ * pas la forme de `cas.json` ; `prompt` : la consigne (celle du banc d'AM-3 par défaut ; celle d'`archimetrics review` en mode
+ * « revue », qui donne donc une autre empreinte sur les mêmes cas et les mêmes diffs) ; fins de ligne ramenées à LF (un checkout `core.autocrlf` ne la change pas). Un banc dont un
  * cas manque a une empreinte suffixée `-partiel` : il ne se compare à aucun autre.
  * @param {string} [dir]
  * @param {{ repos?: Record<string, string>, run?: Function }} [o]
  */
-export function loadBench(dir = BENCH_DIR, { repos, run } = {}) {
+export function loadBench(dir = BENCH_DIR, { repos, run, prompt = { version: PROMPT_VERSION, text: SYSTEM } } = {}) {
   const bench = JSON.parse(readFileSync(join(dir, 'cas.json'), 'utf8'))
   const paths = repoPaths(dir, repos)
-  const hash = createHash('sha256').update(PROMPT_VERSION).update(SYSTEM).update(JSON.stringify(bench.depots))
+  const hash = createHash('sha256').update(prompt.version).update(prompt.text).update(JSON.stringify(bench.depots))
   const cas = bench.cas.map((c) => {
     const got = caseDiff(c, { dir, repos: paths, run })
     hash.update(JSON.stringify([c.id, c.depot, c.attendu, c.constats])).update(got.diffText ?? `(indisponible ${c.id})`)
@@ -167,18 +168,19 @@ async function reviewOne(provider, cas, depots, retries) {
 }
 
 /**
- * Passe le banc : une revue par cas, dans l'ordre, notée.
- * @param {{ provider: import('../src/llm/provider.mjs').Provider, bench: ReturnType<typeof loadBench>, retries?: number, only?: string[], onCase?: (s: object) => void }} o
+ * Passe le banc : une revue par cas, dans l'ordre, notée. `review` : la revue d'un cas (par défaut la question unique
+ * d'AM-3 ; `reviewCase` de `revue.mjs` pour `archimetrics review`), qui rend `{ ok, value, attempts, durationMs, usage }`.
+ * @param {{ provider: import('../src/llm/provider.mjs').Provider, bench: ReturnType<typeof loadBench>, retries?: number, only?: string[], onCase?: (s: object) => void, review?: Function }} o
  */
-export async function runBench({ provider, bench, retries = 2, only, onCase = () => {}, onSkip = () => {} }) {
+export async function runBench({ provider, bench, retries = 2, only, onCase = () => {}, onSkip = () => {}, review = reviewOne }) {
   const chosen = only?.length ? bench.cas.filter((c) => only.includes(c.id)) : bench.cas
   const cas = chosen.filter((c) => !c.indisponible)
   for (const c of chosen) if (c.indisponible) onSkip(c)
   const details = []
   for (const c of cas) {
-    const res = await reviewOne(provider, c, bench.depots, retries)
+    const res = await review(provider, c, bench.depots, retries)
     const score = scoreCase(c, res)
-    details.push({ score, revue: res.value, essais: res.attempts })
+    details.push({ score, revue: res.value, essais: res.attempts, ...(res.document ? { document: res.document } : {}) })
     onCase(score)
   }
   // Un passage sur une partie du banc (--case, ou cas indisponibles) ne se compare pas au banc entier.

@@ -2,6 +2,9 @@
 // LE BANC EN UNE COMMANDE (AM-3) :
 //   node bench/run.mjs [--provider ollama|openai-compatible] [--model <nom>] [--base-url <url>] [--api-key-env <VAR>]
 //                      [--allow-remote] [--repo <nom>=<chemin>]… [--case <id>[,<id>…]] [--retries <n>] [--no-write]
+//                      [--mode brut|revue]
+// --mode brut (défaut) : la question unique d'AM-3 (diff seul). --mode revue (AM-4) : chaque cas passe par
+// `archimetrics review` (src/review : segmentation, examen, filtre de la preuve, contre-vérification) ; autre empreinte.
 // Par défaut : Ollama local (http://127.0.0.1:11434) et qwen3:4b-instruct-2507-q4_K_M, la référence de D-007. Une adresse
 // qui n'est pas locale est refusée sans --allow-remote (src/llm/provider.mjs). Écrit une ligne dans bench/resultats.md et
 // le détail dans bench/resultats/ (sauf --no-write) ; imprime le tableau du passage. Les cas de scribe sont extraits du
@@ -10,6 +13,7 @@
 import { parseArgs } from 'node:util'
 import { createProvider } from '../src/llm/index.mjs'
 import { BENCH_DIR, loadBench, runBench, TABLE_HEADER, tableRow, writeResults } from './lib.mjs'
+import { REVIEW_PROMPT, reviewCase } from './revue.mjs'
 
 const DEFAULT_MODEL = 'qwen3:4b-instruct-2507-q4_K_M'
 
@@ -23,6 +27,7 @@ const OPTIONS = {
   case: { type: 'string' },
   retries: { type: 'string', default: '2' },
   'no-write': { type: 'boolean', default: false },
+  mode: { type: 'string', default: 'brut' },
 }
 
 const line = (s) => `${s.id.padEnd(22)} ${s.formatFinal ? `format ok (${s.essais} essai${s.essais > 1 ? 's' : ''})` : 'format KO'}`
@@ -45,11 +50,14 @@ async function main() {
   const spec = { type: o.provider, model: o.model, apiKeyEnv: o['api-key-env'] }
   if (o['base-url']) spec.baseUrl = o['base-url']
   const provider = createProvider(spec, { allowRemote: o['allow-remote'] })
-  const bench = loadBench(BENCH_DIR, { repos: parseRepos(o.repo) })
+  if (!['brut', 'revue'].includes(o.mode)) throw new Error(`--mode ${o.mode} : attendu brut ou revue`)
+  const revue = o.mode === 'revue'
+  const bench = loadBench(BENCH_DIR, { repos: parseRepos(o.repo), ...(revue ? { prompt: REVIEW_PROMPT } : {}) })
   const only = o.case ? o.case.split(',').map((s) => s.trim()) : undefined
-  out(`banc ${bench.empreinte} · ${provider.name} · ${provider.model} · ${provider.baseUrl}`)
+  out(`banc ${bench.empreinte} · mode ${o.mode} · ${provider.name} · ${provider.model} · ${provider.baseUrl}`)
   const run = await runBench({
-    provider, bench, retries: Number(o.retries), only,
+    provider: revue ? { ...provider, name: `${provider.name} (revue)` } : provider, bench, retries: Number(o.retries), only,
+    ...(revue ? { review: reviewCase } : {}),
     onCase: (s) => out(line(s)),
     onSkip: (c) => out(`${c.id.padEnd(22)} sauté : ${c.indisponible}`),
   })

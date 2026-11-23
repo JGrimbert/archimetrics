@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JGrimbert/archimetrics/schemas/review.schema.json",
+  "title": "archimetrics.review/1",
+  "description": "La revue d'un changement (review.json, `archimetrics review`, AM-4). Même règle de compatibilité que metrics.json : un champ facultatif ajouté ne change pas la version.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "date", "changement", "conclusion", "llm", "collecte", "totaux", "constats", "ecartes", "avertissements"],
+  "properties": {
+    "schemaVersion": { "type": "string", "enum": ["archimetrics.review/1"] },
+    "tool": { "type": "string", "enum": ["archimetrics"] },
+    "date": { "type": "string" },
+    "changement": {
+      "type": "object",
+      "required": ["label", "base", "head", "depot", "message"],
+      "properties": {
+        "label": { "type": ["string", "null"], "description": "Ce qui a été demandé : <commit>, <a>..<b>, ou un cas du banc." },
+        "base": { "type": ["string", "null"], "description": "sha de la base (l'arbre vide pour un premier commit)." },
+        "head": { "type": ["string", "null"] },
+        "depot": { "type": ["string", "null"] },
+        "message": { "type": ["string", "null"], "description": "Message du commit, ou liste des commits de l'intervalle." }
+      }
+    },
+    "conclusion": { "type": "string", "enum": ["rien de significatif", "constats"], "description": "« constats » dès qu'un constat avéré ou risqué est gardé." },
+    "llm": {
+      "type": "object",
+      "required": ["statut", "fournisseur", "modele", "distant", "consigne", "raison", "appels", "premierEssai", "echecsFormat", "dureeMs", "jetons"],
+      "properties": {
+        "statut": { "type": "string", "enum": ["actif", "éteint", "indisponible"] },
+        "fournisseur": { "type": ["string", "null"] },
+        "modele": { "type": ["string", "null"] },
+        "distant": { "type": "boolean", "description": "Vrai seulement avec --allow-remote." },
+        "consigne": { "type": ["string", "null"], "description": "Version des consignes des passes." },
+        "raison": { "type": ["string", "null"] },
+        "appels": { "type": "integer" },
+        "premierEssai": { "type": "integer" },
+        "echecsFormat": { "type": "integer" },
+        "dureeMs": { "type": "number" },
+        "jetons": {
+          "type": "object",
+          "required": ["entree", "sortie"],
+          "properties": { "entree": { "type": "number" }, "sortie": { "type": "number" } }
+        }
+      }
+    },
+    "collecte": {
+      "type": "object",
+      "required": ["fichiers", "lus", "exclus", "segments", "secretsMasques", "contexte"],
+      "properties": {
+        "fichiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "statut", "ajouts", "retraits", "exclu"],
+            "properties": {
+              "path": { "type": "string" },
+              "statut": { "type": "string", "enum": ["ajouté", "modifié", "supprimé", "renommé"] },
+              "ajouts": { "type": "integer" },
+              "retraits": { "type": "integer" },
+              "exclu": {
+                "type": ["object", "null"],
+                "required": ["raison", "indice"],
+                "properties": {
+                  "raison": { "type": "string", "enum": ["secret", "binaire", "généré", "volumineux"] },
+                  "indice": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "lus": { "type": "integer" },
+        "exclus": { "type": "integer" },
+        "segments": { "type": "integer" },
+        "secretsMasques": { "type": "integer" },
+        "contexte": {
+          "type": "object",
+          "required": ["disponible", "raison", "resume", "fichiers", "violations"],
+          "properties": {
+            "disponible": { "type": "boolean" },
+            "raison": { "type": ["string", "null"] },
+            "resume": { "type": ["object", "null"], "description": "Champs de summary : { avant, apres }." },
+            "fichiers": {
+              "type": "object",
+              "description": "Par fichier lu : importeurs, imports (graphe de la révision d'arrivée), lignes de code avant / après.",
+              "additionalProperties": {
+                "type": "object",
+                "required": ["importeurs", "imports", "lignesAvant", "lignesApres"],
+                "properties": {
+                  "importeurs": { "type": "array", "items": { "type": "string" } },
+                  "imports": { "type": "array", "items": { "type": "string" } },
+                  "lignesAvant": { "type": ["integer", "null"] },
+                  "lignesApres": { "type": ["integer", "null"] }
+                }
+              }
+            },
+            "violations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["regle", "cle", "etat"],
+                "properties": {
+                  "regle": { "type": "string" },
+                  "cle": { "type": "string" },
+                  "valeur": { "type": ["number", "null"] },
+                  "limite": { "type": ["number", "null"] },
+                  "etat": { "type": "string", "enum": ["nouvelle", "existante", "résorbée"] }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "totaux": {
+      "type": "object",
+      "required": ["constats", "significatifs", "deterministes", "llm", "ecartes"],
+      "properties": {
+        "constats": { "type": "integer" },
+        "significatifs": { "type": "integer" },
+        "deterministes": { "type": "integer" },
+        "llm": { "type": "integer" },
+        "ecartes": { "type": "integer" }
+      }
+    },
+    "constats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "gravite", "fichier", "ligne", "nature", "source", "preuve", "description", "consequence", "correction"],
+        "properties": {
+          "id": { "type": "string" },
+          "gravite": { "type": "string", "enum": ["haute", "moyenne", "basse"] },
+          "fichier": { "type": "string" },
+          "ligne": { "type": ["integer", "null"], "description": "Ligne du fichier après le changement (pour une ligne retirée : là où elle manque)." },
+          "nature": { "type": "string", "enum": ["avéré", "risque", "suggestion"] },
+          "source": { "type": "string", "enum": ["déterministe", "llm"] },
+          "regle": { "type": "string", "description": "Constat déterministe : la règle." },
+          "preuve": { "type": "string", "description": "Ligne changée citée (LLM, vérifiée dans le diff) ou mesure (déterministe) ; un secret n'y figure jamais." },
+          "description": { "type": "string" },
+          "consequence": { "type": "string" },
+          "correction": { "type": "string" },
+          "verification": { "type": "string", "description": "Constat du LLM : verdict de la contre-vérification." }
+        }
+      }
+    },
+    "ecartes": {
+      "type": "array",
+      "description": "Constats du LLM écartés par les filtres (preuve absente, contre-vérification).",
+      "items": {
+        "type": "object",
+        "required": ["fichier", "nature", "description", "raison"],
+        "properties": {
+          "fichier": { "type": "string" },
+          "ligne": { "type": ["integer", "null"] },
+          "nature": { "type": "string" },
+          "description": { "type": "string" },
+          "raison": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "avertissements": { "type": "array", "items": { "type": "string" } }
+  }
+}

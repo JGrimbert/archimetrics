@@ -8,7 +8,12 @@ format JSON, défauts trouvés, constats faux, conclusions « rien de significat
 node bench/run.mjs                                   # Ollama local, qwen3:4b-instruct-2507-q4_K_M (D-007)
 node bench/run.mjs --model qwen3:1.7b --case s1-nbsp-entite,a2-marque-generee --no-write
 node bench/run.mjs --provider openai-compatible --base-url http://127.0.0.1:1234/v1 --model <nom>
+node bench/run.mjs --mode revue                      # AM-4 : par archimetrics review, ≈ 10 min (3 à 5 appels par cas)
 ```
+
+Deux modes, mêmes cas, mêmes diffs, même notation : `--mode brut` (défaut, AM-3), une question par cas sur le diff ;
+`--mode revue` (AM-4), chaque cas passe par `archimetrics review` (« Le mode revue » plus bas). La consigne fait partie de
+l'empreinte : les deux modes ont chacun la leur.
 
 Une adresse qui n'est pas locale est refusée sans `--allow-remote` ; la clé d'un service se lit dans la variable
 d'environnement nommée par `--api-key-env`, jamais dans un fichier. Chaque passage ajoute une ligne à
@@ -52,3 +57,14 @@ L'**empreinte** (8 caractères) couvre les dépôts décrits, chaque cas (attend
 extraits), la consigne et sa version (`PROMPT_VERSION`), pas la forme de `cas.json` : deux lignes
 ne se comparent qu'à empreinte égale. L'adaptateur Ollama fixe température 0 et graine 42 ; cela ne suffit pas : le
 premier passage après chargement du modèle diffère des passages à chaud (voir `resultats.md`). Comparer à chaud.
+
+## Le mode revue (AM-4)
+
+`revue.mjs` passe chaque cas à `reviewChange` (`src/review/index.mjs`) : exclusions et masquage des secrets, constats
+déterministes, segmentation, puis trois filtres sur les constats du modèle. (1) L'examen d'un segment rend des
+constats sans champ « conclusion » (avec ce champ en tête du schéma, Qwen 4B conclut « rien » sur les 10 cas : la
+sortie contrainte écrit d'abord la conclusion). (2) La preuve doit être une ligne changée du segment. (3) Une
+contre-vérification en deux vues, l'avant et l'après puis le diff, avec la justification écrite avant le verdict ; seul
+un double « confirmé » garde le constat. Le message du commit n'est pas montré (comme au mode brut). Le format compte
+« au 1er essai » quand tous les appels d'un cas l'ont été. Le coût se lit dans les colonnes de latence et de jetons ;
+`resultats/` garde, par cas, le document `review.json` complet (constats gardés et écartés, avec leurs raisons).
