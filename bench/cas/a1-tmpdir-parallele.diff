@@ -1,0 +1,14 @@
+diff --git a/test/diff.test.mjs b/test/diff.test.mjs
+index 486de3f..850e58e 100644
+--- a/test/diff.test.mjs
++++ b/test/diff.test.mjs
+@@ -142,8 +141,7 @@ test('--base : deux révisions d’un dépôt factice, commandes git de lecture
+     for (const c of calls) assert.ok(READ_ONLY.includes(c) && ['rev-parse', 'archive', 'log', 'status'].includes(c), `commande git inattendue : ${c}`)
+     assert.ok(calls.includes('archive'))
+     assert.equal(run(root, 'status', '--porcelain', '--branch'), statusBefore)
+-    // Seuls les dossiers nouveaux comptent : un autre fichier de test (analyse Python) peut en créer et en retirer en parallèle.
+-    assert.deepEqual(leftovers().filter((n) => !tmpBefore.includes(n)), [], 'dossier temporaire supprimé')
++    assert.deepEqual(leftovers(), tmpBefore, 'dossier temporaire supprimé')
+     const schema = loadSchema('metrics.schema.json')
+     assert.deepEqual(validate(schema, JSON.parse(JSON.stringify(pair.before.doc))), [])
+     assert.equal(pair.before.doc.commit, one.slice(0, pair.before.doc.commit.length))

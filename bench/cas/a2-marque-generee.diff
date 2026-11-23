@@ -1,0 +1,18 @@
+diff --git a/src/discover/generated.mjs b/src/discover/generated.mjs
+--- a/src/discover/generated.mjs
++++ b/src/discover/generated.mjs
+@@ -12,11 +12,9 @@ import { extname, join } from 'node:path'
+ const DIRS = new Set(['__generated__', 'generated', '.nuxt', '.next', '.output', '.svelte-kit'])
+ const HEAD = 600
+-// Une marque compte en tête de ligne de commentaire seulement (un commentaire qui PARLE de code généré n'en est pas).
+-const COMMENT = String.raw`^\s*(?:\/\/+|\/\*+|\*|#+|<!--)\s*`
+ const MARKS = [
+-  new RegExp(COMMENT + String.raw`(@generated\b)`),
+-  new RegExp(COMMENT + String.raw`((?:this file (?:was|is|has been) )?(?:auto-?|automatically )generated\b)`, 'i'),
+-  new RegExp(COMMENT + String.raw`(code generated\b.*\bdo not edit\b)`, 'i'),
+-  new RegExp(COMMENT + String.raw`(do not edit\b)`, 'i'),
++  new RegExp(String.raw`(@generated\b)`),
++  new RegExp(String.raw`((?:this file (?:was|is|has been) )?(?:auto-?|automatically )generated\b)`, 'i'),
++  new RegExp(String.raw`(code generated\b.*\bdo not edit\b)`, 'i'),
++  new RegExp(String.raw`(do not edit\b)`, 'i'),
+ ]

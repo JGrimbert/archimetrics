@@ -1,0 +1,223 @@
+{
+  "format": "archimetrics.bench/1",
+  "note": "Banc de revue (AM-3) : 10 diffs tirés de l'historique de scribe et d'archimetrics, figés dans cas/ pour ArchiMetrics ; pour scribe (dépôt privé, D-034), seule la référence est versionnée (commit, mode, fichiers) et le diff est extrait à la volée du dépôt local, en lecture seule. « inverse » : le diff d'un correctif renversé, qui réintroduit le défaut corrigé (le défaut attendu est celui que le correctif nomme) ; « direct » : un commit tel quel, jugé sain ; « reconstitué » : un défaut corrigé avant tout commit, refait à la main d'après le journal du lot. Un constat attendu est trouvé quand la description d'un constat (nature avéré ou risque) contient l'un de ses mots-clés (casse et accents ignorés). Changer un cas, un mot-clé ou le prompt change l'empreinte du banc : les passages ne se comparent qu'à empreinte égale.",
+  "depots": {
+    "scribe": "ArchiScribe : application d'édition et d'analyse de livres (frontend Vue 3, backend NestJS en TypeScript, service Python spaCy, recettes Playwright)",
+    "archimetrics": "ArchiMetrics : outil en ligne de commande Node.js (ESM, sans dépendance) de métriques et garde-fous d'architecture"
+  },
+  "cas": [
+    {
+      "id": "s1-nbsp-entite",
+      "depot": "scribe",
+      "source": {
+        "commit": "ffc41a81",
+        "mode": "inverse",
+        "titre": "fix espaces non sécables"
+      },
+      "fichiers": [
+        "frontend/src/components/QuillBlock.vue"
+      ],
+      "attendu": "défaut",
+      "constats": [
+        {
+          "fichier": "frontend/src/components/QuillBlock.vue",
+          "description": "protectNbsp ne traite plus l'entité &nbsp; : la source (outerHTML) sérialise U+00A0 en entité, la protection devient sans effet et l'insécable redevient sécable",
+          "motsCles": [
+            "&nbsp;",
+            "entite",
+            "entity",
+            "serialis"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s2-bascule-course",
+      "depot": "scribe",
+      "source": {
+        "commit": "22926469",
+        "mode": "inverse",
+        "titre": "Recette R5/R6 : attendre que la feuille ouvre la section"
+      },
+      "fichiers": [
+        "frontend/e2e/relations-lexicales.spec.js"
+      ],
+      "attendu": "défaut",
+      "constats": [
+        {
+          "fichier": "frontend/e2e/relations-lexicales.spec.js",
+          "description": "lire aria-expanded puis cliquer : si la feuille ouvre la section entre la lecture et le clic, le clic la referme (course, recette instable sous charge)",
+          "motsCles": [
+            "course",
+            "race",
+            "referm",
+            "intermittent",
+            "flaky",
+            "instab",
+            "timing",
+            "concurren",
+            "entre la lecture",
+            "asynchron"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s3-feuille-relative",
+      "depot": "scribe",
+      "source": {
+        "commit": "6ad6a8e0",
+        "mode": "inverse",
+        "titre": "navigation par url (vue-router) + fix régression pagination"
+      },
+      "fichiers": [
+        "frontend/src/script/paginate.js"
+      ],
+      "attendu": "défaut",
+      "constats": [
+        {
+          "fichier": "frontend/src/script/paginate.js",
+          "description": "feuille de style passée en chemin relatif ('paged.css') : résolue contre l'URL courante, introuvable sous une route imbriquée ; il faut '/paged.css'",
+          "motsCles": [
+            "relati",
+            "absolu",
+            "absolute",
+            "route",
+            "url courante",
+            "racine",
+            "introuvable",
+            "404"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s4-temporel-natif",
+      "depot": "scribe",
+      "source": {
+        "commit": "b2f4598a",
+        "mode": "direct",
+        "titre": "AR12a : Matcher temporel en attributs natifs (sortie identique, ~2× plus rapide)"
+      },
+      "fichiers": [
+        "nlp-service/app/services/temporal.py"
+      ],
+      "attendu": "rien",
+      "constats": []
+    },
+    {
+      "id": "s5-etats-module",
+      "depot": "scribe",
+      "source": {
+        "commit": "d89163f0",
+        "mode": "direct",
+        "titre": "L5f : les états de module nommés et recensés"
+      },
+      "fichiers": [
+        "frontend/src/architecture.test.js"
+      ],
+      "attendu": "rien",
+      "constats": []
+    },
+    {
+      "id": "s6-pastille-titre",
+      "depot": "scribe",
+      "source": {
+        "commit": "c81b2c04",
+        "mode": "direct",
+        "titre": "retouche (WordChip : la pastille creuse se dit au survol)"
+      },
+      "fichiers": [
+        "frontend/src/components/ui/atoms/WordChip.vue"
+      ],
+      "attendu": "rien",
+      "constats": []
+    },
+    {
+      "id": "s7-frise-selecteur",
+      "depot": "scribe",
+      "source": {
+        "commit": "b423d6a0",
+        "mode": "direct",
+        "titre": "Frise : recettes (sélecteurs resserrés)"
+      },
+      "fichiers": [
+        "frontend/e2e/architecture.spec.js",
+        "frontend/e2e/frise.spec.js"
+      ],
+      "attendu": "rien",
+      "constats": []
+    },
+    {
+      "id": "a1-tmpdir-parallele",
+      "depot": "archimetrics",
+      "source": {
+        "commit": "c82f829",
+        "mode": "inverse",
+        "titre": "AM-2 : test des dossiers temporaires sensible au parallélisme"
+      },
+      "diff": "cas/a1-tmpdir-parallele.diff",
+      "attendu": "défaut",
+      "constats": [
+        {
+          "fichier": "test/diff.test.mjs",
+          "description": "le test compare tout le contenu archimetrics-* du dossier temporaire : un autre fichier de test lancé en parallèle (analyse Python) y crée et retire des dossiers, le test devient instable",
+          "motsCles": [
+            "parallel",
+            "concurr",
+            "fragile",
+            "flaky",
+            "intermittent",
+            "instab",
+            "autre test",
+            "autres tests",
+            "autre fichier",
+            "simultan"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a2-marque-generee",
+      "depot": "archimetrics",
+      "source": {
+        "commit": "c82f829",
+        "mode": "reconstitué",
+        "titre": "AM-2 : marque « généré » reconnue dans un commentaire qui en parle"
+      },
+      "diff": "cas/a2-marque-generee.diff",
+      "attendu": "défaut",
+      "constats": [
+        {
+          "fichier": "src/discover/generated.mjs",
+          "description": "les marques ne sont plus ancrées en tête de ligne de commentaire : un fichier dont le texte ou un commentaire PARLE de code généré (« do not edit », « generated ») est écarté à tort des mesures",
+          "motsCles": [
+            "ancr",
+            "anchor",
+            "tete de ligne",
+            "debut de ligne",
+            "faux positif",
+            "false positive",
+            "a tort",
+            "n'importe ou",
+            "anywhere",
+            "trop large",
+            "parle"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a3-groupes-origine",
+      "depot": "archimetrics",
+      "source": {
+        "commit": "c82f829",
+        "mode": "direct",
+        "titre": "AM-2 : groupes avec origine, sans groupe de tests seuls"
+      },
+      "diff": "cas/a3-groupes-origine.diff",
+      "attendu": "rien",
+      "constats": []
+    }
+  ]
+}
