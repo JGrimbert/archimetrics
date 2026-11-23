@@ -21,6 +21,8 @@
   ci-dessous. `npm test` : **35 tests verts** ; `check --root . --no-git` : 0 violation nouvelle, 37 tolérées.
 - **Prochain lot** : AM-3 (adaptateurs LLM), au choix de l'auteur ; fiche `lots/AM-2.md` d'`archi` à passer à « fait »
   (hors de ce dépôt, non touchée).
+- **DS-4 acceptée** (option (b), 2026-11-23) : relevé de découverte en champ `discovery` de premier niveau et page
+  « Découverte » du rapport, avec AM-5 ; à reporter dans `ARCHI_DECISIONS.md`.
 - `chantiers/ecosysteme/` (dossier vide) supprimé par `rmdir` [CONSTAT].
 - **Baseline** : `node bin/archimetrics.mjs check --root . --no-git` relève **37 violations**, comme attendu (aucun
   écart avec 37) [CONSTAT] : `functionLines` 8, `cyclomatic` 12, `cognitive` 16, `nesting` 1. Elles sont toutes
@@ -133,14 +135,22 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
   qui sont des dossiers, tous observés par construction.
 - [INTERPRÉTATION] Le relevé de découverte est rangé dans `coupling.resolution` (ce qui a servi à résoudre les imports et
   à reconnaître les entrées), parce que `src/metrics/index.mjs`, qui compose `metrics.json`, est hors du périmètre du
-  lot. Voir DS-4.
+  lot. DS-4 (acceptée, option (b)) le déplacera dans un champ `discovery` avec AM-5.
 - [CONSTAT] Test existant fragile, corrigé : `--base … dossier temporaire intacts` comparait tout le contenu de
   `os.tmpdir()` ; l'analyseur Python (`src/analyze/python.mjs`) y crée aussi des dossiers `archimetrics-*` et le nouveau
   `test/discover.test.mjs` (qui analyse du Python) tourne en parallèle. Le test ne regarde plus que les dossiers nouveaux.
 
 ## Décisions à soumettre
 
-### DS-4 — Où publier le relevé de découverte dans `metrics.json` (proposée, non bloquante)
+_Aucune en attente._
+
+## Décisions tranchées
+
+### DS-4 — Où publier le relevé de découverte dans `metrics.json` — **acceptée : option (b)** (à reporter dans `ARCHI_DECISIONS.md`)
+- **Décision** : acceptée par l'auteur le 2026-11-23, option **(b)** : un champ de premier niveau `discovery`
+  (facultatif, `archimetrics.metrics/1` inchangé) et une page « Découverte » dans le rapport Markdown. **À livrer avec
+  AM-5** (dont le périmètre devra inclure `src/metrics/index.mjs` et `src/report/markdown.mjs`), sauf lot dédié décidé
+  d'ici là. `coupling.resolution`, non garanti, pourra alors être retiré sans changer de version. Pas encore codé.
 - **Contexte** : AM-2 range alias, paquets, racines Python, entrées et code généré dans `coupling.resolution` (non
   garanti), faute de pouvoir toucher `src/metrics/index.mjs` dans ce lot.
 - **Options** : (a) garder `coupling.resolution` ; (b) un champ de premier niveau `discovery` (facultatif, sans `/2`),
@@ -148,8 +158,6 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
   (`src/report/markdown.mjs`, hors périmètre aussi).
 - **Recommandation** : **(b)**, avec AM-5 (restitution) ou un petit lot dédié : la découverte concerne tout le relevé,
   pas seulement le couplage, et le lecteur du rapport doit voir ce qui a été deviné.
-
-## Décisions tranchées
 
 ### DS-3 — Configuration employée par `diff --base` — **tranchée : D-020, option (c)**
 - **Décision** : D-020 (validée) retient **(c)** : chaque côté garde sa configuration ; un avertissement est émis quand
@@ -195,3 +203,5 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
   de tests seuls) ; `coupling.mjs` (`*.worker.*`, `resolution`) ; D-020 dans `diff-cli.mjs` / `diff.mjs` ; schéma
   (champs facultatifs) ; README. Essais sur scribe, CC, jgr-ui (copies hors dépôt). `npm test` 35/35 ; `check` : 0
   violation nouvelle, 37 tolérées. DS-4 proposée.
+- **2026-11-23** — DS-4 acceptée par l'auteur, option (b) : `discovery` de premier niveau et page « Découverte », avec
+  AM-5 (à reporter dans `ARCHI_DECISIONS.md`).

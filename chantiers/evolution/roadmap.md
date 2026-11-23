@@ -72,6 +72,10 @@ rien n'est fusionné.
 - **À faire** : « points d'attention » (hiérarchie à partir des violations, points chauds, cycles) et
   « recommandations » ; réorganisation de `src/report/markdown.mjs` (aujourd'hui `pages` est en baseline : 231 lignes
   pour 60 tolérées [CONSTAT]) — le lot doit le découper plutôt que l'allonger.
+- **DS-4 (acceptée, option (b))** : sortir le relevé de découverte de `coupling.resolution` vers un champ de premier
+  niveau `discovery` (facultatif, sans `/2`, décrit dans `schemas/metrics.schema.json`), et ajouter une page
+  « Découverte » au rapport (ce qui a été deviné, avec `origine` / `confiance` / `indices`). Périmètre à prévoir :
+  `src/metrics/index.mjs`, `src/metrics/coupling.mjs`, `src/report/markdown.mjs`, `schemas/metrics.schema.json`.
 
 ## AM-6 · Autodiagnostic
 
