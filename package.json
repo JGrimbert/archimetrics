@@ -9,6 +9,7 @@
   },
   "files": [
     "bin",
+    "schemas",
     "src"
   ],
   "engines": {

@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JGrimbert/archimetrics/schemas/metrics.schema.json",
+  "title": "archimetrics.metrics/1",
+  "description": "Le relevé d'archimetrics (metrics.json). Champs garantis en v1 : ceux de `required`. Ajouter un champ facultatif ne change pas la version ; retirer, renommer ou changer le type d'un champ garanti oblige à passer à archimetrics.metrics/2. Les sections marquées « non garanti en v1 » peuvent changer sans changer de version.",
+  "$comment": "Sous-ensemble de JSON Schema employé (validé par src/schema.mjs) : type, required, properties, items, enum, additionalProperties.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "name", "date", "commit", "limits", "summary", "violations", "groups", "check"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "string", "enum": ["archimetrics.metrics/1"] },
+    "tool": { "type": "string", "enum": ["archimetrics"] },
+    "name": { "type": "string", "description": "Nom du projet analysé." },
+    "date": { "type": "string", "description": "Date du relevé (ISO 8601)." },
+    "commit": { "type": ["string", "null"], "description": "Commit analysé (court), null hors dépôt Git ou pour une révision extraite." },
+    "limits": {
+      "type": "object",
+      "description": "Les seuils appliqués ; null désactive une règle.",
+      "properties": {
+        "fileCodeLines": { "type": ["integer", "null"] },
+        "functionLines": { "type": ["integer", "null"] },
+        "params": { "type": ["integer", "null"] },
+        "cyclomatic": { "type": ["integer", "null"] },
+        "cognitive": { "type": ["integer", "null"] },
+        "nesting": { "type": ["integer", "null"] },
+        "filesPerDir": { "type": ["integer", "null"] },
+        "docMaxLines": { "type": ["integer", "null"] },
+        "docRequiredFrom": { "type": ["integer", "null"] },
+        "lcom": { "type": ["integer", "null"] },
+        "cycles": { "type": ["boolean", "null"] },
+        "docLinks": { "type": ["boolean", "null"] }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["files", "testFiles", "codeLines", "testCodeLines", "functions", "cyclomaticAvg", "cognitiveAvg", "duplicationPercent", "cycles", "deadExports", "docs", "violations"],
+      "properties": {
+        "files": { "type": "integer", "description": "Fichiers de code hors tests." },
+        "testFiles": { "type": "integer" },
+        "codeLines": { "type": "integer", "description": "Lignes de code hors tests (sans commentaires ni lignes vides)." },
+        "testCodeLines": { "type": "integer" },
+        "functions": { "type": "integer" },
+        "cyclomaticAvg": { "type": "number" },
+        "cognitiveAvg": { "type": "number" },
+        "duplicationPercent": { "type": "number" },
+        "cycles": { "type": "integer" },
+        "deadExports": { "type": "integer" },
+        "docs": { "type": "integer" },
+        "violations": { "type": "integer" }
+      }
+    },
+    "violations": {
+      "type": "object",
+      "description": "Règle → liste des violations. Seul `key` est garanti dans chaque violation ; `value`, `limit`, `detail` sont décrits, non garantis en v1.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["key"],
+          "properties": {
+            "key": { "type": "string", "description": "Identifiant stable de la violation (celui de la baseline)." },
+            "value": { "description": "Valeur mesurée (non garanti en v1)." },
+            "limit": { "description": "Seuil dépassé (non garanti en v1)." },
+            "detail": { "description": "Précision lisible (non garanti en v1)." }
+          }
+        }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "description": "Le premier découpage du projet, avec ses totaux (hors tests).",
+      "items": {
+        "type": "object",
+        "required": ["name", "path", "files", "codeLines", "functions", "complexity"],
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "files": { "type": "integer" },
+          "codeLines": { "type": "integer" },
+          "functions": { "type": "integer" },
+          "complexity": { "type": "integer", "description": "Somme des complexités cyclomatiques." }
+        }
+      }
+    },
+    "check": {
+      "type": ["object", "null"],
+      "description": "Le jugement face à la baseline ; null sans baseline.",
+      "required": ["ok", "added", "resolved", "tolerated"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "added": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "object", "required": ["key"], "properties": { "key": { "type": "string" } } } }
+        },
+        "resolved": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "tolerated": { "type": "integer" }
+      }
+    },
+    "files": {
+      "type": "array",
+      "description": "Inventaire des fichiers de code (non garanti en v1).",
+      "items": { "type": "object", "properties": { "path": { "type": "string" }, "lang": { "type": "string" }, "test": { "type": "boolean" }, "codeLines": { "type": "integer" } } }
+    },
+    "sizes": { "type": "object", "description": "Tailles détaillées (non garanti en v1)." },
+    "functions": { "type": "object", "description": "Fonctions : moyennes, centiles, histogrammes, plus complexes (non garanti en v1)." },
+    "organisation": { "type": "object", "description": "Dossiers et docs de dossier (non garanti en v1)." },
+    "coupling": { "type": "object", "description": "Couplage, cycles, exports morts, classes (non garanti en v1)." },
+    "duplication": { "type": "object", "description": "Clones au renommage près (non garanti en v1)." },
+    "history": { "type": "object", "description": "Points chauds et couplage temporel (non garanti en v1)." },
+    "warnings": { "type": "array", "items": { "type": "string" }, "description": "Avertissements d'analyse (non garanti en v1)." },
+    "durationMs": { "type": "integer", "description": "Durée du relevé (non garanti en v1)." },
+    "baselinePath": { "type": "string", "description": "Chemin de la baseline (non garanti en v1)." }
+  }
+}

@@ -1,9 +1,9 @@
 // LES FICHIERS LUS : ceux que Git suit ou n'ignore pas (`git ls-files -co --exclude-standard`), sinon un parcours du disque
 // (liens symboliques et jonctions jamais suivis). Chemins relatifs en barres obliques, quel que soit le système.
 
-import { execFileSync } from 'node:child_process'
 import { existsSync, lstatSync, readdirSync } from 'node:fs'
 import { extname, join, relative } from 'node:path'
+import { tryGit } from './git.mjs'
 
 export const toPosix = (p) => p.replace(/\\/g, '/')
 
@@ -11,12 +11,8 @@ const LANG = { '.vue': 'vue', '.py': 'py', '.ts': 'ts', '.mts': 'ts', '.cts': 't
 export const langOf = (ext) => LANG[ext] ?? 'js'
 
 function gitFiles(root) {
-  try {
-    const out = execFileSync('git', ['ls-files', '-co', '--exclude-standard', '-z'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] })
-    return out.split('\0').filter(Boolean)
-  } catch {
-    return null
-  }
+  const out = tryGit(['ls-files', '-co', '--exclude-standard', '-z'], { cwd: root })
+  return out === null ? null : out.split('\0').filter(Boolean)
 }
 
 function walkFiles(root, dir, out) {
@@ -40,9 +36,10 @@ export function isExcluded(rel, cfg) {
 
 export const isTest = (rel, cfg) => cfg.testRes.some((re) => re.test(rel))
 
-// Tous les fichiers du projet (code ou non), filtrés par `include` / `exclude`.
+// Tous les fichiers du projet (code ou non), filtrés par `include` / `exclude`. Avec `cfg.useGit === false` (révision
+// extraite dans un dossier temporaire) : parcours du disque seul.
 export function listAll(cfg) {
-  const all = gitFiles(cfg.root) ?? walkFiles(cfg.root, cfg.root, [])
+  const all = (cfg.useGit === false ? null : gitFiles(cfg.root)) ?? walkFiles(cfg.root, cfg.root, [])
   const roots = cfg.include.map((r) => toPosix(r).replace(/^\.\/?/, '').replace(/\/$/, ''))
   return all
     .map(toPosix)

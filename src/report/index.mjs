@@ -26,6 +26,11 @@ function put(out, rel, text) {
   writeFileSync(p, text)
 }
 
+/** Le contenu de `metrics.json` (format `archimetrics.metrics/1`) : le relevé, plus le jugement de la baseline ou `null`. */
+export function metricsDocument(result, check) {
+  return { ...result, check: check ? { ok: check.ok, added: check.added, resolved: check.resolved, tolerated: check.tolerated } : null }
+}
+
 export function writeReport(cfg, result, model, check, { out, historyIn = null }) {
   // Le dossier est vidé à chaque relevé : un diagramme qui n'a plus lieu d'être ne traîne pas sur la branche.
   rmSync(out, { recursive: true, force: true })
@@ -41,7 +46,7 @@ export function writeReport(cfg, result, model, check, { out, historyIn = null }
   put(out, 'svg/evolution.svg', evolutionSvg(nextHistory))
   put(out, 'svg/carte.svg', carteSvg(result, model))
   put(out, 'svg/risques.svg', risquesSvg(result))
-  put(out, 'metrics.json', JSON.stringify({ ...result, check: check ? { ok: check.ok, added: check.added, resolved: check.resolved, tolerated: check.tolerated } : null }, null, 1))
+  put(out, 'metrics.json', JSON.stringify(metricsDocument(result, check), null, 1))
   put(out, 'history.json', JSON.stringify(nextHistory, null, 1))
   return { out, history: nextHistory }
 }

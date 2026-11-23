@@ -1,9 +1,10 @@
 // LE RELEVÉ COMPLET : fichiers → analyse → graphe → métriques. Rend un objet sérialisable (aucun texte de code), plus le
 // modèle interne (`model`) dont les diagrammes ont besoin.
 
-import { execFileSync } from 'node:child_process'
 import { analyzeFiles } from '../analyze/index.mjs'
 import { listAll, listCode } from '../files.mjs'
+import { tryGit } from '../git.mjs'
+import { METRICS_SCHEMA } from '../schema.mjs'
 import { buildGraph } from '../graph.mjs'
 import { couplingMetrics } from './coupling.mjs'
 import { duplicationMetrics } from './duplication.mjs'
@@ -64,10 +65,11 @@ export function collect(cfg, { hotspots = true } = {}) {
   })
 
   const result = {
+    schemaVersion: METRICS_SCHEMA,
     tool: 'archimetrics',
     name: cfg.name,
     date: new Date().toISOString(),
-    commit: gitHead(cfg.root),
+    commit: cfg.useGit === false ? null : gitHead(cfg.root),
     limits: cfg.limits,
     summary: {
       files: sizes.files,
@@ -84,6 +86,8 @@ export function collect(cfg, { hotspots = true } = {}) {
       violations: Object.values(violations).reduce((s, v) => s + v.length, 0),
     },
     groups: groupStats,
+    // L'inventaire des fichiers de code (non garanti en v1) : sert aux fichiers apparus / disparus d'`archimetrics diff`.
+    files: files.map((f) => ({ path: f.rel, lang: f.lang, test: f.test, codeLines: f.codeLines })).sort((a, b) => (a.path < b.path ? -1 : 1)),
     sizes,
     functions,
     organisation,
@@ -98,9 +102,5 @@ export function collect(cfg, { hotspots = true } = {}) {
 }
 
 function gitHead(root) {
-  try {
-    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-  } catch {
-    return null
-  }
+  return tryGit(['rev-parse', '--short', 'HEAD'], { cwd: root })?.trim() ?? null
 }

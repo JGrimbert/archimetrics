@@ -4,17 +4,13 @@
 //   (degré = commits communs / moyenne de leurs commits). Les commits trop larges (renommages, formatage) sont écartés.
 // Il faut l'historique complet (`fetch-depth: 0` en CI) ; un clone superficiel rend des points chauds vides.
 
-import { execFileSync } from 'node:child_process'
+import { tryGit } from '../git.mjs'
 
 export function hotspotMetrics(cfg, files, graph, cyclomaticPerFile) {
   const opts = cfg.hotspots
   const known = new Map(files.map((f) => [f.rel, f]))
-  let log
-  try {
-    log = execFileSync('git', ['log', `--since=${opts.months}.months`, '--no-merges', '--name-only', '--format=%x00%H'], { cwd: cfg.root, encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] })
-  } catch {
-    return { available: false, commits: 0, hotspots: [], temporal: [] }
-  }
+  const log = cfg.useGit === false ? null : tryGit(['log', `--since=${opts.months}.months`, '--no-merges', '--name-only', '--format=%x00%H'], { cwd: cfg.root })
+  if (log === null) return { available: false, commits: 0, hotspots: [], temporal: [] }
   const commits = log.split('\0').slice(1).map((c) => c.split('\n').slice(1).map((s) => s.trim()).filter((s) => known.has(s)))
   const count = new Map()
   const pairs = new Map()

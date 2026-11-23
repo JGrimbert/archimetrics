@@ -112,6 +112,45 @@ Les paquets des workspaces npm sont reconnus seuls ; un seuil à `null` désacti
   strict (`strictBaseline`, par défaut), aussi sur une violation tolérée qui a disparu : elle doit sortir de la liste, qui
   ne fait que rétrécir.
 
+## Le relevé `metrics.json` et sa version
+
+`metrics.json` (écrit par `report` / `all`) porte en tête `"schemaVersion": "archimetrics.metrics/1"`. Son schéma (JSON
+Schema 2020-12) est publié dans [`schemas/metrics.schema.json`](schemas/metrics.schema.json).
+
+- **Garantis en v1** : `schemaVersion`, `tool`, `name`, `date`, `commit` (chaîne ou `null`), `limits`, `summary` (tous
+  ses champs), `violations` (règle → liste de violations, dont seul `key` est garanti), `groups` (`name`, `path`,
+  `files`, `codeLines`, `functions`, `complexity`), `check` (objet ou `null`).
+- **Décrits, non garantis en v1** : `files`, `sizes`, `functions`, `organisation`, `coupling`, `duplication`, `history`,
+  `warnings`, `durationMs`, `baselinePath`, et les champs `value` / `limit` / `detail` d'une violation.
+
+**Règle de compatibilité.** Ajouter un champ facultatif ne change pas la version. Retirer, renommer ou changer le type
+d'un champ garanti oblige à passer à `archimetrics.metrics/2`. Cette version du format et l'étiquette `v1` de l'Action
+sont deux choses distinctes : l'une ne suit pas l'autre.
+
+## Comparer deux relevés : `archimetrics diff`
+
+```
+node bin/archimetrics.mjs diff avant/metrics.json apres/metrics.json --out /tmp/diff
+node bin/archimetrics.mjs diff --base main --root ../mon-projet --out /tmp/diff               # main → arbre de travail
+node bin/archimetrics.mjs diff --base 1a2b3c4 --head 5d6e7f8 --root ../mon-projet --out /tmp/diff  # entre deux commits
+```
+
+Écrit `metrics-diff.json` (`"schemaVersion": "archimetrics.metrics-diff/1"`, schéma
+[`schemas/metrics-diff.schema.json`](schemas/metrics-diff.schema.json)) et `metrics-diff.md` (par défaut dans
+`<root>/.archimetrics/diff`) : l'écart de chaque champ de `summary`, les violations ajoutées et résorbées par règle (par
+clé), l'écart par groupe, les fichiers apparus et disparus quand les deux relevés ont leur inventaire `files`. Le code
+de sortie est 0 : le diff informe, `check` juge.
+
+- **`--base <ref>`** analyse une révision **sans toucher au dépôt** : `git archive` de la révision vers un dossier
+  temporaire du système, analyse sans Git (ni points chauds), dossier supprimé à la fin. Ni `checkout`, ni `stash`, ni
+  `worktree` : archimetrics ne lance que des commandes Git de lecture (`src/git.mjs` refuse les autres). Sans `--head`,
+  l'autre côté est l'arbre de travail (fichiers suivis ou non ignorés). Chaque côté est mesuré avec **sa** configuration
+  (`archimetrics.config.json` de la révision, ou les valeurs par défaut si elle n'en a pas), sauf avec `--config <f>`,
+  qui impose la même aux deux côtés (utile pour une révision antérieure à la config) ; la mesure est toujours faite par
+  la version courante d'archimetrics. Les deux relevés comparés sont écrits à côté (`avant.json`, `apres.json`). Un fichier marqué `export-ignore` dans `.gitattributes` n'est pas extrait.
+- Un relevé **sans `schemaVersion`** (antérieur à v1, par exemple sur une branche `metriques` déjà publiée) est lu comme
+  « pré-v1 », avec un avertissement, s'il a au moins `summary` et `violations` ; sinon, l'erreur le dit.
+
 ## Limites connues
 
 - Complexité cognitive approchée : ni sauts étiquetés ni récursion ; une fonction imbriquée est mesurée à part.

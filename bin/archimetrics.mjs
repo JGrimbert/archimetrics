@@ -6,12 +6,16 @@
 //   archimetrics all       …                                   report + check (code de sortie du check)
 //   archimetrics baseline  [--root .]                          écrit la baseline d'après l'état présent
 //   archimetrics readme    [--root .] [--write README.md]      le bloc à poser dans le README du projet (ou l'y écrit, entre marqueurs)
+//   archimetrics diff      <avant.json> <après.json> [--out d]  compare deux relevés → metrics-diff.json + .md (code 0)
+//   archimetrics diff      --base <ref> [--head <ref>] [--root .] [--config f] [--out d]   idem entre une révision (git archive vers un
+//                          dossier temporaire) et l'arbre de travail ou une autre révision ; le dépôt n'est pas touché
 // Options : --no-git (sans points chauds) ; --summary <fichier> (compte rendu Markdown du check, ex. $GITHUB_STEP_SUMMARY).
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { compare, readBaseline, writeBaseline } from '../src/baseline.mjs'
 import { loadConfig } from '../src/config.mjs'
+import { runDiff } from '../src/diff-cli.mjs'
 import { collect } from '../src/metrics/index.mjs'
 import { checkMarkdown } from '../src/report/markdown.mjs'
 import { writeReport } from '../src/report/index.mjs'
@@ -29,6 +33,8 @@ if (cmd === 'help' || flag('help')) {
   console.log(readFileSync(new URL(import.meta.url), 'utf8').split('\n').filter((l) => l.startsWith('//')).map((l) => l.slice(3)).join('\n'))
   process.exit(0)
 }
+
+if (cmd === 'diff') process.exit(runDiff(argv, opt))
 
 const root = resolve(opt('root', '.'))
 const cfg = loadConfig(root, opt('config'))

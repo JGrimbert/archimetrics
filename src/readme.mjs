@@ -2,20 +2,16 @@
 // Les images sont lues sur la branche (raw.githubusercontent.com) : elles se mettent à jour sans aucun commit sur la branche
 // du code. L'adresse du dépôt vient de `publish.repo` (« propriétaire/nom »), sinon du remote `origin`.
 
-import { execFileSync } from 'node:child_process'
+import { tryGit } from './git.mjs'
 
 export const START = '<!-- archimetrics:debut -->'
 export const END = '<!-- archimetrics:fin -->'
 
 export function repoSlug(cfg) {
   if (cfg.publish.repo) return cfg.publish.repo
-  try {
-    const url = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: cfg.root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-    const m = url.match(/github\.com[:/](.+?)(\.git)?$/)
-    return m ? m[1] : null
-  } catch {
-    return null
-  }
+  const url = tryGit(['remote', 'get-url', 'origin'], { cwd: cfg.root })?.trim()
+  const m = url?.match(/github\.com[:/](.+?)(\.git)?$/)
+  return m ? m[1] : null
 }
 
 export function readmeBlock(cfg) {

@@ -3,7 +3,7 @@
 > Cible, livrables et critères de fin de chaque lot : **Phase 2** de `C:\jgr\archi\ARCHI_ROADMAP.md` (seule référence,
 > non recopiée ici). Ce document n'ajoute que ce qui est propre au dépôt : fichiers touchés, ordre interne, risques,
 > et ce que l'audit de [state.md](state.md) retire ou ajoute à chaque lot.
-> Statut : **proposée**, à valider par l'auteur (critère de fin d'AM-0).
+> Statut : **validée par l'auteur le 2026-11-23** (fin d'AM-0). AM-1 : fait sur `lot/AM-1` (voir [state.md](state.md)).
 
 Ordre : AM-1 → (AM-2 ‖ AM-3) → AM-4 → AM-5 → AM-6. Une branche `lot/AM-n` par lot, partie de la précédente tant que
 rien n'est fusionné.
@@ -21,8 +21,10 @@ rien n'est fusionné.
   `test/fixtures/`.
 - **Ordre interne** : validateur + schéma + test de non-régression → `diff` sur deux fichiers → lecture pré-v1 →
   `--base` → essai sur scribe (sortie hors dépôt).
-- **Risques** : `--base` sur Windows (`git archive` → tar : extraire sans dépendance npm demande `tar` du système,
-  présent sous Windows 10+ [À VÉRIFIER] ; sinon lecteur tar minimal en JS) ; durée d'analyse de scribe deux fois
+- **Livré** (écart au plan) : `src/tar.mjs` (lecteur tar minimal, retenu plutôt que le `tar` du système), `src/git.mjs`
+  (tous les appels Git), `src/diff-cli.mjs` ; `src/report/index.mjs` exporte `metricsDocument` ; `--config` sur
+  `diff --base`.
+- **Risques** (au départ) : `--base` sur Windows (extraire l'archive sans dépendance npm) ; durée d'analyse de scribe deux fois
   (borne de 2 min de P2) ; `commit` vaut `null` dans le dossier extrait → le diff doit afficher la référence demandée.
   Décisions DS-1 et DS-2 de [state.md](state.md) à trancher avant d'écrire le schéma.
 
@@ -34,7 +36,8 @@ rien n'est fusionné.
   (`compilerOptions.paths`, `baseUrl`) et `vite.config` (lecture statique de `resolve.alias`, sans exécuter le fichier) ;
   racines Python (`pyproject.toml`, dossiers à `__init__.py`) ; points d'entrée depuis `package.json`
   (`bin`, `main`, `exports`) et routes de frameworks ; code généré (en-têtes « generated », dossiers connus) ;
-  champs `origine` / `confiance` / `indices` (facultatifs dans le schéma v1) ; groupe vide `test` à ne plus émettre.
+  champs `origine` / `confiance` / `indices` (facultatifs dans le schéma v1) ; groupe vide `test` à ne plus émettre ;
+  DS-3 (avertir quand les deux côtés d'un `diff --base` n'ont pas la même config).
 - **Fichiers** : `src/config.mjs`, nouveau `src/discover/` (un module par source d'indices), `src/metrics/groups.mjs`,
   `src/metrics/coupling.mjs` (`ENTRY`), `schemas/metrics.schema.json`.
 - **Risques** : lire `vite.config` sans l'exécuter ne couvre que les formes littérales → `confiance` basse et indice

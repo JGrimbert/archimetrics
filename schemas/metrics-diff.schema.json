@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JGrimbert/archimetrics/schemas/metrics-diff.schema.json",
+  "title": "archimetrics.metrics-diff/1",
+  "description": "La comparaison de deux relevés (metrics-diff.json, `archimetrics diff`). Même règle de compatibilité que metrics.json : un champ facultatif ajouté ne change pas la version.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "date", "before", "after", "summary", "violations", "totals", "groups", "files", "warnings"],
+  "properties": {
+    "schemaVersion": { "type": "string", "enum": ["archimetrics.metrics-diff/1"] },
+    "tool": { "type": "string", "enum": ["archimetrics"] },
+    "date": { "type": "string" },
+    "before": {
+      "type": "object",
+      "required": ["label", "name", "commit", "date", "schemaVersion"],
+      "properties": {
+        "label": { "type": "string", "description": "Chemin du fichier, référence Git, ou « arbre de travail »." },
+        "name": { "type": ["string", "null"] },
+        "commit": { "type": ["string", "null"] },
+        "date": { "type": ["string", "null"] },
+        "schemaVersion": { "type": ["string", "null"], "description": "null : relevé pré-v1." }
+      }
+    },
+    "after": {
+      "type": "object",
+      "required": ["label", "name", "commit", "date", "schemaVersion"],
+      "properties": {
+        "label": { "type": "string" },
+        "name": { "type": ["string", "null"] },
+        "commit": { "type": ["string", "null"] },
+        "date": { "type": ["string", "null"] },
+        "schemaVersion": { "type": ["string", "null"] }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Champ de summary → avant, après, écart (null si l'un des deux n'est pas un nombre).",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["before", "after", "delta"],
+        "properties": { "delta": { "type": ["number", "null"] } }
+      }
+    },
+    "violations": {
+      "type": "object",
+      "description": "Règle → nombres avant / après et clés ajoutées / résorbées.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["before", "after", "added", "resolved"],
+        "properties": {
+          "before": { "type": "integer" },
+          "after": { "type": "integer" },
+          "added": { "type": "array", "items": { "type": "string" } },
+          "resolved": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "required": ["added", "resolved"],
+      "properties": { "added": { "type": "integer" }, "resolved": { "type": "integer" } }
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "files", "codeLines", "functions", "complexity"],
+        "properties": {
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["commun", "apparu", "disparu"] }
+        }
+      }
+    },
+    "files": {
+      "type": "object",
+      "required": ["available", "added", "removed"],
+      "properties": {
+        "available": { "type": "boolean", "description": "false : l'un des relevés n'a pas d'inventaire `files`." },
+        "added": { "type": "array", "items": { "type": "string" } },
+        "removed": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}
