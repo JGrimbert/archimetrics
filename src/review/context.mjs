@@ -63,7 +63,8 @@ const linesOf = (result, path) => result?.files?.find((f) => f.path === path)?.c
  * @param {string[]} paths fichiers touchés et lus
  */
 export function measuredContext(root, { base, head }, paths) {
-  const tmp = mkdtempSync(join(tmpdir(), 'archimetrics-revue-'))
+  // Préfixe hors de « archimetrics-* » : test/diff.test.mjs surveille ces dossiers pendant que les tests tournent en parallèle.
+  const tmp = mkdtempSync(join(tmpdir(), 'am-revue-'))
   try {
     const after = measureSha(root, head, tmp)
     const before = base === EMPTY_TREE ? null : measureSha(root, base, tmp)

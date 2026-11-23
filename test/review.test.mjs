@@ -26,7 +26,7 @@ globalThis.fetch = async () => {
   globalCalls++
   throw new Error('réseau interdit dans les tests')
 }
-const OUT = mkdtempSync(join(tmpdir(), 'archimetrics-test-revue-'))
+const OUT = mkdtempSync(join(tmpdir(), 'am-test-revue-'))
 after(() => {
   globalThis.fetch = realFetch
   rmSync(OUT, { recursive: true, force: true })
