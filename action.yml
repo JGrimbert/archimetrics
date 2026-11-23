@@ -1,0 +1,92 @@
+name: archimetrics
+description: Métriques et garde-fous d'architecture (tailles, complexité, couplage, cohésion, redondances, organisation, diagrammes Mermaid), rapport publié sur une branche orpheline.
+author: JGrimbert
+branding:
+  icon: bar-chart-2
+  color: blue
+
+inputs:
+  root:
+    description: Dossier du projet analysé (relatif au dépôt cloné).
+    default: '.'
+  config:
+    description: Fichier de configuration (par défaut archimetrics.config.json à la racine du projet).
+    default: ''
+  branch:
+    description: Branche orpheline qui reçoit le rapport.
+    default: metriques
+  publish:
+    description: "auto : publier sur un push de la branche par défaut ; true : toujours ; false : jamais."
+    default: auto
+  check:
+    description: Faire échouer le job sur une violation nouvelle (ou résorbée encore dans la baseline, en mode strict).
+    default: 'true'
+  setup-node:
+    description: Installer Node 20 (false si le job l'a déjà fait).
+    default: 'true'
+  artifact:
+    description: Joindre le rapport au job (pièce jointe téléchargeable).
+    default: 'true'
+
+outputs:
+  status:
+    description: Code de sortie du garde-fou (0 si aucune violation nouvelle).
+    value: ${{ steps.run.outputs.status }}
+
+runs:
+  using: composite
+  steps:
+    - if: inputs.setup-node == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Installer archimetrics
+      shell: bash
+      run: npm ci --omit=dev --no-audit --no-fund --prefix "$GITHUB_ACTION_PATH"
+
+    # L'historique des relevés vit sur la branche des rapports : il est relu pour l'écart au relevé précédent et les courbes.
+    - name: Relire l'historique des relevés
+      shell: bash
+      env:
+        ROOT: ${{ inputs.root }}
+        BRANCH: ${{ inputs.branch }}
+      run: |
+        if git -C "$ROOT" fetch --quiet --depth=1 origin "$BRANCH" 2>/dev/null; then
+          git -C "$ROOT" show FETCH_HEAD:history.json > "$RUNNER_TEMP/archimetrics-history.json" 2>/dev/null || echo '[]' > "$RUNNER_TEMP/archimetrics-history.json"
+        else
+          echo '[]' > "$RUNNER_TEMP/archimetrics-history.json"
+        fi
+
+    - name: Relevé et garde-fous
+      id: run
+      shell: bash
+      env:
+        ROOT: ${{ inputs.root }}
+        CONFIG: ${{ inputs.config }}
+      run: |
+        set +e
+        node "$GITHUB_ACTION_PATH/bin/archimetrics.mjs" all --root "$ROOT" ${CONFIG:+--config "$CONFIG"} \
+          --out "$RUNNER_TEMP/archimetrics" --history "$RUNNER_TEMP/archimetrics-history.json" --summary "$GITHUB_STEP_SUMMARY"
+        echo "status=$?" >> "$GITHUB_OUTPUT"
+
+    - if: inputs.artifact == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: archimetrics
+        path: ${{ runner.temp }}/archimetrics
+
+    - name: Publier sur la branche des rapports
+      if: inputs.publish == 'true' || (inputs.publish == 'auto' && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+      shell: bash
+      env:
+        ROOT: ${{ inputs.root }}
+        BRANCH: ${{ inputs.branch }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/publish.sh" "$RUNNER_TEMP/archimetrics" "$BRANCH" "$ROOT"
+
+    - name: Verdict des garde-fous
+      if: inputs.check == 'true' && steps.run.outputs.status != '0'
+      shell: bash
+      run: |
+        echo "::error::archimetrics : violation(s) nouvelle(s) — voir le résumé du job."
+        exit 1
