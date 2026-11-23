@@ -1,6 +1,7 @@
 # Chantier « évolution » d'ArchiMetrics — état
 
-> Vérifié le **2026-11-23** : AM-0 à AM-3 fusionnés dans `main` (AM-3 validé, code `25e665d`) ; `v1` sur `68392ca`.
+> Vérifié le **2026-11-23** : AM-0 à AM-3 fusionnés dans `main` (AM-3 validé, code `25e665d`) ; AM-4 livré sur
+> `lot/AM-4`, à valider ; `v1` sur `68392ca`.
 > Cible du chantier : Phase 2 de `C:\jgr\archi\ARCHI_ROADMAP.md` (lots AM-0 à AM-6). Plan interne : [roadmap.md](roadmap.md).
 > Statuts : [CONSTAT] (fichier cité), [INTERPRÉTATION], [HYPOTHÈSE], [À VÉRIFIER].
 
@@ -23,8 +24,11 @@
 - **AM-3 fait, validé par l'auteur et fusionné dans `main`** le 2026-11-23 (avance rapide depuis `lot/AM-3`, non poussé) : `src/llm/` (interface fournisseur, Ollama, compatible OpenAI,
   JSON validé + réessai, garde `--allow-remote`) et banc `bench/` (10 diffs, `node bench/run.mjs`). Détail et mesures :
   « Banc de revue (AM-3) » ci-dessous. `npm test` : **56 tests verts** ; `check --root .` : 0 violation nouvelle, 37 tolérées.
-- **Prochain lot** : AM-4 (`archimetrics review`, sur le banc d'AM-3) ou AM-5 (restitution, avec D-021), au choix de
-  l'auteur.
+- **AM-4 livré sur `lot/AM-4`, à valider** (2026-11-23, non fusionné, non poussé) : `archimetrics review` (`src/review/`,
+  `schemas/review.schema.json`, mode `--mode revue` du banc). Détail et mesures : « Revue (AM-4) » ci-dessous.
+  `npm test` : **69 tests verts** ; `check --root .` : 0 violation nouvelle, 37 tolérées. Critère du banc : voir D-035
+  (proposée) dans `C:\jgrrchi\ARCHI_DECISIONS.md`.
+- **Prochain lot** : AM-5 (restitution, avec D-021), ou le rappel de la revue (D-035 (c)), au choix de l'auteur.
 - **DS-4 acceptée** (option (b), 2026-11-23) : relevé de découverte en champ `discovery` de premier niveau et page
   « Découverte » du rapport, avec AM-5 ; reportée : D-021.
 - `chantiers/ecosysteme/` (dossier vide) supprimé par `rmdir` [CONSTAT].
@@ -172,6 +176,43 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
 - [INTERPRÉTATION] Qwen 4B, diff seul, est loin du critère d'AM-4 (≤ 1 constat faux sur 5) : la revue devra lui donner du
   contexte (fichier entier, voisins, métriques), segmenter, et filtrer les constats (preuve exigée, gravité), et la
   partie déterministe porter l'essentiel. Le banc mesure ces progrès à empreinte égale.
+
+## Revue (AM-4)
+
+- **Commande** [CONSTAT `src/review/cli.mjs`] : `archimetrics review [<commit>|<a>..<b>|<a>...<b>] [--root .] [--out d]
+  [--no-llm] [--no-metrics] [--provider …] [--model …] [--base-url …] [--api-key-env …] [--allow-remote]` → `review.json`
+  (`archimetrics.review/1`, `schemas/review.schema.json`) et `review.md` (par défaut `.archimetrics/review/`), code 0.
+  HEAD par défaut ; un premier commit se compare à l'arbre vide.
+- **Collecte** [CONSTAT `src/review/collect.mjs`, `git.mjs`, `context.mjs`] : message (ou liste des commits), fichiers
+  (statut, ajouts, retraits), diff, début de chaque fichier après le changement, puis contexte mesuré : les deux
+  révisions extraites par `git archive` dans un dossier temporaire, relevées sans Git ; voisins (importeurs, imports) par
+  le graphe de la révision d'arrivée ; lignes de code avant/après ; violations touchées (nouvelle, existante, résorbée).
+  Git : `rev-parse`, `log`, `diff`, `show`, `merge-base`, `archive` seulement (testé : dépôt inchangé).
+- **Exclusions** [CONSTAT `src/review/exclude.mjs`, testé] : secrets par le nom (`.env*` sauf `.example`/`.sample`…,
+  clés, `credentials*`, `.npmrc`…), binaires, générés (verrous, `.min.js`, cartes, instantanés, dossiers générés,
+  marque d'en-tête : même règle que la découverte), diff > 200 000 caractères. Lignes de secret (clé privée, jetons
+  GitHub, AWS, Slack, Google, `sk-…`, `password = "…"`) **masquées avant toute passe** : test que ni le modèle, ni
+  `review.json`, ni `review.md` ne contiennent la valeur.
+- **Déterministe** [CONSTAT `src/review/deterministic.mjs`] : marqueur de conflit, `.only` dans un test, `debugger`, secret
+  ajouté, violation nouvelle dans un fichier touché. C'est toute la revue LLM éteint (`--no-llm`) ou injoignable
+  (`llm.statut` : `éteint` ou `indisponible`), testé.
+- **Passes** [CONSTAT `src/review/passes.mjs`, consigne `revue-am4-3`] : segments d'au plus 6 000 caractères par fichier ;
+  examen par `completeJson` (schéma sans champ « conclusion ») ; preuve = une ligne changée du segment, sinon écarté ;
+  contre-vérification en deux vues (avant/après, puis diff), justification avant verdict, gardé seulement sur deux
+  « confirmé ». Les écartés restent dans `ecartes` avec leur raison. Fournisseur par `createProvider` : distant refusé
+  sans `--allow-remote` avant tout appel (testé, 0 `fetch`).
+- **Mesure de Qwen** [CONSTAT `bench/resultats.md`, `node bench/run.mjs --mode revue`, banc `03ad2d95` : mêmes cas et
+  mêmes diffs que `778e1cf7`, empreinte changée par la consigne] : format 10/10 au 1er essai ; sains « rien » **5/5**
+  (AM-3 : 2/5) ; constats faux / émis **0/1** (19:39, non écrit), **1/1** (19:52), **0/0** (20:15), soit 1 faux pour 2 émis sur trois passages (AM-3 : 8/11) ; défauts trouvés
+  **1/15 sur les trois passages** (AM-3 : 2/5 par passage) ; latence médiane 55–66 s par cas, 585–622 s le banc, ≈ 13 000 jetons de sortie (AM-3 : 7,8 s,
+  78 s, 1 826) : 3 à 5 appels par cas.
+- [INTERPRÉTATION] Les filtres tiennent la précision, mais Qwen 4B ne trouve presque plus rien : le critère « ≤ 1 faux
+  sur 5 » est tenu ou non selon le passage, sur 1 ou 2 constats. La relecture du constat compté faux (a1) en montre le
+  bon mécanisme. Comment juger le critère et où chercher le rappel : **D-035** (proposée). Variantes essayées et
+  abandonnées : champ « conclusion » en tête (`7ad80874`, muet), une seule contre-vérification (`598da884`, 3/5 faux ;
+  `26e27538`, 2/3), avant/après aussi à l'examen (`5801ea3f`, muet).
+- Limites [CONSTAT] : les fichiers non-code (Markdown) passent aussi par le LLM ; au-delà de `--max-segments` (40), les
+  segments ne sont pas revus (avertissement) ; la revue n'est pas encore branchée dans `archi verify` (après validation).
 
 ## Décisions à soumettre
 

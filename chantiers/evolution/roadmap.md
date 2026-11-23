@@ -62,6 +62,7 @@ rien n'est fusionné.
   d'imports viennent de `src/graph.mjs`.
 - **Fichiers** : `src/review/` (collecte, exclusions, segmentation, passes), `schemas/review.schema.json`
   (`archimetrics.review/1`), `bin/archimetrics.mjs`.
+- **Livré sur `lot/AM-4`** (à valider) : voir « Revue (AM-4) » de [state.md](state.md) et D-035 (proposée).
 - **Risques** : fuite de secrets dans le contexte envoyé (exclusion testée) ; la partie déterministe doit tourner LLM
   éteint.
 
