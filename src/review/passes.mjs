@@ -11,7 +11,19 @@
 import { completeJson } from '../llm/index.mjs'
 import { changedLines } from './diff.mjs'
 
-export const REVIEW_PROMPT_VERSION = 'revue-am4-3'
+// La version de la chaîne des passes (consigne et filtres) : elle entre dans l'empreinte du banc. `revue-am4-3` : fin
+// d'AM-4 ; `revue-am4b-1` : même consigne, preuve découpée aussi sur les « \n » littéraux (AM-4b).
+export const REVIEW_PROMPT_VERSION = 'revue-am4b-1'
+
+/**
+ * Le CONTEXTE des passes (AM-4b) : « diff » (AM-4 : le segment seul) ou « fichier » (le fichier après le changement, en
+ * plus du diff : entier s'il tient dans `MAX_FICHIER` caractères, sinon une fenêtre autour des lignes du segment).
+ */
+export const CONTEXTES = ['diff', 'fichier']
+export const MAX_FICHIER = 12000
+
+/** La version de la consigne pour un contexte : elle entre dans `review.json` (`llm.consigne`) et l'empreinte du banc. */
+export const promptVersion = (contexte = 'diff') => (contexte === 'fichier' ? `${REVIEW_PROMPT_VERSION}+fichier-1` : REVIEW_PROMPT_VERSION)
 
 const GRAVITE = { type: 'string', enum: ['haute', 'moyenne', 'basse'] }
 
@@ -96,8 +108,9 @@ function locateOne(text, lines) {
  */
 export function locateProof(preuve, hunks) {
   const lines = changedLines(hunks).filter((l) => squash(l.text))
-  // Fins de ligne CRLF : `locateOne` ramène les blancs (dont \r) à rien.
-  const found = String(preuve).split('\n').map((t) => locateOne(t, lines)).filter(Boolean)
+  // Fins de ligne CRLF : `locateOne` ramène les blancs (dont \r) à rien. Un modèle écrit souvent un bloc avec des « \n »
+  // LITTÉRAUX (échappés deux fois dans le JSON) : ils séparent aussi les lignes (mesuré sur le banc, s1, AM-4b).
+  const found = String(preuve).split(/\n|\\n/).map((t) => locateOne(t, lines)).filter(Boolean)
   return found.find((l) => l.kind === '+') ?? found[0] ?? null
 }
 
@@ -112,12 +125,52 @@ const contextBlock = (ctx = {}) => {
   return parts.join('\n')
 }
 
+/**
+ * La fenêtre du fichier après le changement montrée avec un segment : les lignes numérotées, entières si elles tiennent
+ * dans `max` caractères, sinon élargies autour des lignes du segment (côté nouveau fichier) jusqu'à `max`. Null sans texte.
+ * @param {string | null | undefined} text
+ * @param {import('./diff.mjs').Segment} segment
+ */
+export function fileWindow(text, segment, max = MAX_FICHIER) {
+  if (typeof text !== 'string' || !text) return null
+  const numbered = text.replace(/\r\n/g, '\n').split('\n').map((l, i) => `${String(i + 1).padStart(5)}| ${l}`)
+  const cost = (i) => numbered[i].length + 1
+  if (numbered.reduce((n, l) => n + l.length + 1, 0) <= max) return { texte: numbered.join('\n'), entier: true }
+  const nums = segment.hunks.flatMap((h) => h.lines.map((l) => l.newLine ?? l.at)).filter(Number.isInteger)
+  const last = numbered.length - 1
+  let lo = Math.min(Math.max(0, Math.min(...nums) - 1), last)
+  let hi = lo
+  let size = cost(lo)
+  // D'abord jusqu'à la dernière ligne du segment, puis des deux côtés tour à tour, tant que `max` le permet.
+  const end = Math.min(last, Math.max(...nums) - 1)
+  while (hi < end && size + cost(hi + 1) <= max) size += cost(++hi)
+  for (let grew = true; grew;) {
+    const up = hi < last && size + cost(hi + 1) <= max
+    if (up) size += cost(++hi)
+    const down = lo > 0 && size + cost(lo - 1) <= max
+    if (down) size += cost(--lo)
+    grew = up || down
+  }
+  return { texte: numbered.slice(lo, hi + 1).join('\n'), entier: false, de: lo + 1, a: hi + 1, total: numbered.length }
+}
+
+/** Le bloc « fichier après le changement » d'un message, ou null. */
+function fileBlock(ctx, segment) {
+  const w = fileWindow(ctx?.fichier, segment)
+  if (!w) return null
+  const title = w.entier ? `Fichier ${segment.path} APRÈS le changement (entier, lignes numérotées ; pour le contexte)`
+    : `Fichier ${segment.path} APRÈS le changement (lignes ${w.de} à ${w.a} sur ${w.total}, numérotées ; pour le contexte)`
+  return block(title, w.texte)
+}
+
 /** Les messages de l'examen d'un segment. */
 export function examenMessages(segment, ctx) {
   const part = segment.of > 1 ? ` (segment ${segment.index}/${segment.of})` : ''
   // Le diff seul : montrer aussi l'avant et l'après à l'examen (consigne revue-am4-4, banc 5801ea3f) a fait taire le
   // modèle (0 constat émis sur 10 cas) ; la vue avant / après sert à la contre-vérification.
-  const user = `${contextBlock(ctx)}\n\nFichier : ${segment.path}${part}\n\nDiff :\n\`\`\`diff\n${segment.text}\`\`\``
+  // Contexte « fichier » (AM-4b) : le fichier après le changement, avant le diff.
+  const file = fileBlock(ctx, segment)
+  const user = `${contextBlock(ctx)}${file ? `\n\n${file}` : ''}\n\nFichier : ${segment.path}${part}\n\nDiff :\n\`\`\`diff\n${segment.text}\`\`\``
   return [{ role: 'system', content: SYSTEM_EXAMEN }, { role: 'user', content: user.trim() }]
 }
 
@@ -136,12 +189,13 @@ export const VIEWS = ['avant-après', 'diff']
  * Les messages de la contre-vérification sous une vue : « avant-après » (les deux côtés des blocs, un petit modèle
  * confondant « - » et « + ») ou « diff » (le diff unifié du segment).
  */
-export function verifMessages(segment, c, view = 'avant-après') {
+export function verifMessages(segment, c, view = 'avant-après', ctx = {}) {
   const claim = `Constat proposé (${c.nature}, ${c.gravite}) : ${c.description}\nConséquence annoncée : ${c.consequence}\nLigne citée : ${c.preuve}`
   const code = view === 'diff'
     ? [block('Diff unifié du changement (« - » : avant ; « + » : après)', segment.text.trimEnd())]
     : [block('AVANT le changement', sideText(segment.hunks, 'avant')), block('APRÈS le changement', sideText(segment.hunks, 'après'))]
-  const user = [`Fichier : ${segment.path}`, ...code, claim].join('\n\n')
+  const file = fileBlock(ctx, segment)
+  const user = [`Fichier : ${segment.path}`, ...(file ? [file] : []), ...code, claim].join('\n\n')
   return [{ role: 'system', content: SYSTEM_VERIF }, { role: 'user', content: user }]
 }
 
@@ -177,10 +231,10 @@ const located = (segment, c, line) => ({
  * Contre-vérifie un constat avéré ou risqué sous les deux vues (avant / après, puis diff) ; il n'est gardé que si les deux
  * le confirment (mesuré sur le banc : chaque vue seule laisse passer des faux différents). Rend `{ garde, raison }`.
  */
-async function verify(provider, segment, f, stats, retries) {
+async function verify(provider, segment, f, { stats, retries, ctx }) {
   const notes = []
   for (const view of VIEWS) {
-    const v = await ask(provider, verifMessages(segment, f, view), { schema: VERIF_SCHEMA, stats, retries })
+    const v = await ask(provider, verifMessages(segment, f, view, ctx), { schema: VERIF_SCHEMA, stats, retries })
     if (!v) return { garde: false, raison: `contre-vérification (${view}) illisible` }
     notes.push(`${view} : ${v.verdict} (${squash(v.justification).slice(0, 200)})`)
     if (v.verdict !== 'confirmé') return { garde: false, raison: `contre-vérification ${notes.join(' ; ')}` }
@@ -192,7 +246,7 @@ async function verify(provider, segment, f, stats, retries) {
  * Les passes sur un segment : rend `{ constats, ecartes }`.
  * @param {import('../llm/provider.mjs').Provider} provider
  * @param {import('./diff.mjs').Segment} segment
- * @param {object} ctx `{ depot, message, voisins, metriques }`
+ * @param {object} ctx `{ depot, message, voisins, metriques, fichier }` (`fichier` : le texte après le changement, ou null)
  * @param {{ stats: ReturnType<typeof newStats>, retries?: number, maxConstats?: number }} o
  */
 export async function reviewSegment(provider, segment, ctx, { stats, retries = 2, maxConstats = 5 }) {
@@ -206,7 +260,7 @@ export async function reviewSegment(provider, segment, ctx, { stats, retries = 2
       continue
     }
     const f = located(segment, c, line)
-    const check = f.nature === 'suggestion' ? { garde: true, raison: null } : await verify(provider, segment, f, stats, retries)
+    const check = f.nature === 'suggestion' ? { garde: true, raison: null } : await verify(provider, segment, f, { stats, retries, ctx })
     if (check.garde) constats.push(check.raison ? { ...f, verification: check.raison } : f)
     else ecartes.push({ fichier: f.fichier, ligne: f.ligne, nature: f.nature, description: f.description, raison: check.raison })
   }

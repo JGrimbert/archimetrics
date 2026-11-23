@@ -17,3 +17,6 @@ AM-4, 2026-11-23. Mode `--mode revue` (`archimetrics review`), fournisseur noté
 | 2026-11-23 19:52 | 03ad2d95 | ollama (revue) | qwen3:4b-instruct-2507-q4_K_M | 10/10 | 10/10 | 0/5 | 5/5 | 1/1 | 62 s | 115.6 s | 586.5 s | 12953 |
 | 2026-11-23 20:04 | 5801ea3f | ollama (revue) | qwen3:4b-instruct-2507-q4_K_M | 10/10 | 10/10 | 0/5 | 5/5 | 0/0 | 59.3 s | 145.4 s | 699.9 s | 13666 |
 | 2026-11-23 20:15 | 03ad2d95 | ollama (revue) | qwen3:4b-instruct-2507-q4_K_M | 10/10 | 10/10 | 0/5 | 5/5 | 0/0 | 66 s | 127.9 s | 621.7 s | 13096 |
+| 2026-11-23 21:07 | 864bf925 | ollama (revue, fichier) | qwen3:4b-instruct-2507-q4_K_M | 10/10 | 10/10 | 1/5 | 5/5 | 0/1 | 133.7 s | 469.7 s | 1663.4 s | 14955 |
+| 2026-11-23 21:33 | 864bf925 | ollama (revue, fichier) | qwen3:4b-instruct-2507-q4_K_M | 10/10 | 10/10 | 1/5 | 5/5 | 0/1 | 130.6 s | 428.3 s | 1588.4 s | 15027 |
+| 2026-11-23 22:00 | 864bf925 | ollama (revue, fichier) | qwen3:4b-instruct-2507-q4_K_M | 10/10 | 10/10 | 1/5 | 5/5 | 0/1 | 127.3 s | 467.7 s | 1634.4 s | 15027 |

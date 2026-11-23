@@ -16,7 +16,7 @@ import { exclusion, redactSecrets, secretIn } from '../src/review/exclude.mjs'
 import { REVIEW_READ_ONLY, gitRead, resolveRange } from '../src/review/git.mjs'
 import { reviewChange } from '../src/review/index.mjs'
 import { reviewMarkdown } from '../src/review/markdown.mjs'
-import { EXAMEN_SCHEMA, locateProof, VERIF_SCHEMA, VIEWS } from '../src/review/passes.mjs'
+import { EXAMEN_SCHEMA, fileWindow, locateProof, promptVersion, REVIEW_PROMPT_VERSION, VERIF_SCHEMA, VIEWS } from '../src/review/passes.mjs'
 import { assertSupported, loadSchema, validate } from '../src/schema.mjs'
 
 // AUCUN APPEL RÉSEAU : `fetch` global piégé ; les fournisseurs sont des faux, en mémoire.
@@ -184,6 +184,9 @@ test('constat du LLM gardé : preuve retrouvée (même recopiée sur plusieurs l
   assert.match(views[1], /Diff unifié/)
   assert.equal(locateProof('return x + 1', parseDiff(DIFF)[0].hunks).kind, '-')
   assert.equal(locateProof('x', parseDiff(DIFF)[0].hunks), null, 'une preuve trop courte n’est pas cherchée dans les lignes')
+  // « \n » littéraux (bloc recopié, échappé deux fois dans le JSON) : ils séparent les lignes comme un vrai saut.
+  assert.equal(locateProof(String.raw`export function f(x) {\n  return x - 1\n}`, parseDiff(DIFF)[0].hunks)?.kind, '+')
+  assert.equal(locateProof(String.raw`export function f(x) {\n  return x - 1\n}`.replace('x - 1', 'x * 2'), parseDiff(DIFF)[0].hunks), null)
   assert.deepEqual(validate(EXAMEN_SCHEMA, { constats: [] }), [])
   assertSupported(EXAMEN_SCHEMA)
   assertSupported(VERIF_SCHEMA)
@@ -303,4 +306,63 @@ test('banc en mode « revue » : même cas et mêmes diffs, empreinte propre ; u
   assert.deepEqual([s.formatPremier, s.trouves, s.faux], [true, 1, 0])
   const off = await reviewCase(providerFrom({ provider: 'ollama', model: 'm' }, { fetch: async () => { throw new Error('ECONNREFUSED') } }), cas, brut.depots, 2)
   assert.equal(scoreCase(cas, off).formatFinal, false)
+})
+
+test('contexte « fichier » (AM-4b) : fenêtre du fichier après le changement, entière ou bornée autour du segment', () => {
+  const [seg] = segmentFile(parseDiff(DIFF)[0])
+  const small = fileWindow('export function f(x) {\r\n  return x - 1\r\n}\r\n// fin', seg)
+  assert.equal(small.entier, true)
+  assert.match(small.texte, /^ {4}1\| export function f\(x\) \{\n {4}2\| {3}return x - 1\n/)
+  assert.ok(!small.texte.includes('\r'))
+  assert.equal(fileWindow(null, seg), null)
+  assert.equal(fileWindow('', seg), null)
+  // 500 lignes, segment aux lignes 1 à 4 : la fenêtre part du début et s'arrête à la borne.
+  const big = Array.from({ length: 500 }, (_, i) => `ligne ${i + 1} ${'x'.repeat(40)}`).join('\n')
+  const w = fileWindow(big, seg, 2000)
+  assert.equal(w.entier, false)
+  assert.equal(w.de, 1)
+  assert.ok(w.texte.length <= 2000 && w.a > 4 && w.total === 500)
+  // Segment au milieu : la fenêtre l'entoure des deux côtés.
+  const mid = segmentFile(parseDiff(DIFF.replace('@@ -1,4 +1,4 @@', '@@ -250,4 +250,4 @@'))[0])[0]
+  const m = fileWindow(big, mid, 2000)
+  assert.ok(m.de < 250 && m.a > 253, `${m.de}-${m.a}`)
+  assert.match(m.texte, /^ {2}250\| ligne 250 /m)
+})
+
+test('contexte « fichier » : le fichier est montré à l\'examen et aux deux contre-vérifications ; consigne notée ; refus d\'un contexte inconnu', async () => {
+  const p = fakeProvider({ examen: () => ({ constats: [constat('+  return x - 1')] }) })
+  const fichiers = { 'src/a.mjs': 'export function f(x) {\n  return x - 1\n}\n// fin\n' }
+  const doc = await reviewChange({ diffText: DIFF, provider: p, contexte: 'fichier', fichiers })
+  valid(doc)
+  assert.equal(doc.llm.consigne, promptVersion('fichier'))
+  assert.notEqual(promptVersion('fichier'), REVIEW_PROMPT_VERSION)
+  assert.equal(p.calls.length, 3)
+  for (const c of p.calls) assert.match(c.messages[1].content, /APRÈS le changement \(entier, lignes numérotées/)
+  const plain = fakeProvider()
+  const d2 = await reviewChange({ diffText: DIFF, provider: plain, fichiers })
+  assert.equal(d2.llm.consigne, REVIEW_PROMPT_VERSION)
+  assert.doesNotMatch(plain.calls[0].messages[1].content, /APRÈS le changement/, 'contexte « diff » par défaut : fichiers ignorés')
+  const none = fakeProvider()
+  await reviewChange({ diffText: DIFF, provider: none, contexte: 'fichier' })
+  assert.doesNotMatch(none.calls[0].messages[1].content, /APRÈS le changement/, 'fichier absent : le diff seul')
+  await assert.rejects(reviewChange({ diffText: DIFF, provider: fakeProvider(), contexte: 'tout' }), /contexte « tout »/)
+})
+
+test('contexte « fichier » dans un dépôt : fichier entier lu à la révision d\'arrivée (git show), dépôt inchangé', async () => {
+  const root = join(OUT, 'depot-fichier')
+  mkdirSync(root, { recursive: true })
+  git(OUT, 'init', '-q', '-b', 'main', root)
+  writeFileSync(join(root, 'c.mjs'), 'export const c = 1\n')
+  git(root, 'add', '.')
+  git(root, 'commit', '-q', '-m', 'base')
+  writeFileSync(join(root, 'c.mjs'), 'export const c = 2\n// suite du fichier\n')
+  git(root, 'commit', '-q', '-am', 'c change')
+  writeFileSync(join(root, 'c.mjs'), 'modifié dans l\'arbre de travail\n')
+  const p = fakeProvider()
+  const doc = await reviewRepo({ root, range: 'HEAD', provider: p, metrics: false, contexte: 'fichier' })
+  assert.equal(doc.llm.consigne, promptVersion('fichier'))
+  assert.match(p.calls[0].messages[1].content, / {4}2\| \/\/ suite du fichier/)
+  assert.doesNotMatch(p.calls[0].messages[1].content, /arbre de travail/)
+  assert.equal(git(root, 'status', '--porcelain'), ' M c.mjs\n')
+  assert.equal(providerFrom({ provider: 'ollama', model: 'm', 'num-ctx': '8192' }).model, 'm')
 })

@@ -9,7 +9,7 @@ import { ProviderError } from '../llm/index.mjs'
 import { lineFindings, secretFindings, violationFindings } from './deterministic.mjs'
 import { fileText, parseDiff, segmentFile } from './diff.mjs'
 import { exclusion, redactSecrets } from './exclude.mjs'
-import { newStats, REVIEW_PROMPT_VERSION, reviewSegment } from './passes.mjs'
+import { CONTEXTES, newStats, promptVersion, reviewSegment } from './passes.mjs'
 
 export const REVIEW_SCHEMA_VERSION = 'archimetrics.review/1'
 const RANK = { haute: 0, moyenne: 1, basse: 2 }
@@ -72,12 +72,12 @@ async function llmPasses(provider, segments, ctxOf, o) {
   return out
 }
 
-const llmBlock = (provider, r) => ({
+const llmBlock = (provider, r, contexte) => ({
   statut: provider ? r.statut : 'éteint',
   fournisseur: provider?.name ?? null,
   modele: provider?.model ?? null,
   distant: provider?.remote ?? false,
-  consigne: provider ? REVIEW_PROMPT_VERSION : null,
+  consigne: provider ? promptVersion(contexte) : null,
   raison: provider ? r.raison : 'aucun fournisseur (--no-llm) : partie déterministe seule',
   appels: r?.stats.appels ?? 0,
   premierEssai: r?.stats.premierEssai ?? 0,
@@ -91,10 +91,13 @@ const llmBlock = (provider, r) => ({
  * @param {{ diffText: string, label?: string, base?: string | null, head?: string | null, depot?: string | null,
  *   message?: string | null, heads?: Record<string, string>, measured?: object | null,
  *   provider?: import('../llm/provider.mjs').Provider | null, maxSegments?: number, maxChars?: number, retries?: number,
- *   now?: () => Date }} o
+ *   contexte?: 'diff' | 'fichier', fichiers?: Record<string, string>, now?: () => Date }} o
+ * `contexte: 'fichier'` (AM-4b) montre aux passes, avec chaque segment, le fichier après le changement pris dans `fichiers`
+ * (chemin → texte ; un fichier absent n'a que son diff).
  */
 export async function reviewChange(o) {
-  const { diffText, provider = null, measured = null, maxSegments = 40, maxChars = 6000, retries = 2 } = o
+  const { diffText, provider = null, measured = null, maxSegments = 40, maxChars = 6000, retries = 2, contexte = 'diff' } = o
+  if (!CONTEXTES.includes(contexte)) throw new Error(`contexte « ${contexte} » : attendu ${CONTEXTES.join(' ou ')}`)
   const classified = classify(parseDiff(diffText), o.heads)
   const lus = classified.filter((x) => !x.info.exclu).map((x) => x.f)
   const redacted = lus.map((f) => ({ path: f.path, lines: redactSecrets(f) }))
@@ -104,6 +107,7 @@ export async function reviewChange(o) {
   const ctxOf = (path) => ({
     depot: o.depot ?? null, message: o.message ?? null,
     voisins: measured?.fichiers?.[path] ?? null, metriques: metricsLine(measured?.fichiers?.[path], violations, path),
+    fichier: contexte === 'fichier' ? o.fichiers?.[path] ?? null : null,
   })
   const r = provider ? await llmPasses(provider, segments, ctxOf, { maxSegments, retries }) : null
   const constats = sortFindings([...deterministes, ...(r?.constats ?? [])])
@@ -114,7 +118,7 @@ export async function reviewChange(o) {
     date: (o.now?.() ?? new Date()).toISOString(),
     changement: changeOf(o),
     conclusion: totaux.significatifs ? 'constats' : 'rien de significatif',
-    llm: llmBlock(provider, r),
+    llm: llmBlock(provider, r, contexte),
     collecte: {
       fichiers: classified.map((x) => x.info),
       lus: lus.length,

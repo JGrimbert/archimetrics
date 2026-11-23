@@ -5,10 +5,11 @@
 // (`REVIEW_PROMPT`) : mêmes cas, mêmes diffs, autre mesure.
 
 import { reviewChange } from '../src/review/index.mjs'
-import { REVIEW_PROMPT_VERSION, SYSTEM_EXAMEN, SYSTEM_VERIF } from '../src/review/passes.mjs'
+import { promptVersion, SYSTEM_EXAMEN, SYSTEM_VERIF } from '../src/review/passes.mjs'
 
-/** La consigne du mode « revue », pour l'empreinte du banc (`loadBench(dir, { prompt })`). */
-export const REVIEW_PROMPT = { version: REVIEW_PROMPT_VERSION, text: `${SYSTEM_EXAMEN}\n---\n${SYSTEM_VERIF}` }
+/** La consigne du mode « revue » pour un contexte (`diff`, ou `fichier` d'AM-4b), pour l'empreinte (`loadBench(dir, { prompt })`). */
+export const reviewPrompt = (contexte = 'diff') => ({ version: promptVersion(contexte), text: `${SYSTEM_EXAMEN}\n---\n${SYSTEM_VERIF}` })
+export const REVIEW_PROMPT = reviewPrompt()
 
 /**
  * La revue d'un cas par `archimetrics review`, rendue dans la forme que note le banc. Le format compte « au 1er essai »
@@ -16,9 +17,11 @@ export const REVIEW_PROMPT = { version: REVIEW_PROMPT_VERSION, text: `${SYSTEM_E
  * réessais n'apporte aucun constat ; `document.llm.echecsFormat` les compte).
  * @returns {Promise<{ ok: boolean, value: object | null, attempts: object[], durationMs: number, usage: object, document?: object, error?: string }>}
  */
-export async function reviewCase(provider, cas, depots, retries) {
+export async function reviewCase(provider, cas, depots, retries, { contexte = 'diff' } = {}) {
   const t0 = performance.now()
-  const doc = await reviewChange({ diffText: cas.diffText, label: cas.id, depot: depots[cas.depot] ?? cas.depot, provider, retries })
+  const doc = await reviewChange({
+    diffText: cas.diffText, label: cas.id, depot: depots[cas.depot] ?? cas.depot, provider, retries, contexte, fichiers: cas.fichiersApres,
+  })
   const durationMs = Math.round(performance.now() - t0)
   const l = doc.llm
   if (l.statut !== 'actif') return { ok: false, value: null, attempts: [{ ms: durationMs, errors: [l.raison] }], durationMs, usage: { output: 0 }, document: doc, error: l.raison }

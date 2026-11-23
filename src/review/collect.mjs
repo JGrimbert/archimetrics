@@ -12,7 +12,8 @@ import { classify, reviewChange } from './index.mjs'
 /**
  * La revue d'un changement du dépôt `root`.
  * @param {{ root: string, range?: string, provider?: object | null, metrics?: boolean, maxSegments?: number,
- *   maxChars?: number, retries?: number, onGit?: (args: string[]) => void }} o
+ *   maxChars?: number, retries?: number, contexte?: 'diff' | 'fichier', onGit?: (args: string[]) => void }} o
+ * `contexte: 'fichier'` lit aussi chaque fichier revu, entier, à la révision d'arrivée (`git show <head>:<chemin>`).
  */
 export async function reviewRepo({ root, range, provider = null, metrics = true, onGit, ...rest }) {
   const g = { onGit }
@@ -22,8 +23,10 @@ export async function reviewRepo({ root, range, provider = null, metrics = true,
   const heads = Object.fromEntries(files.filter((f) => !f.binary).map((f) => [f.path, headOf(root, r.head, f.path, 600, g)]).filter(([, h]) => h !== null))
   const lus = classify(files, heads).filter((x) => !x.info.exclu && x.info.statut !== 'supprimé').map((x) => x.f.path)
   const measured = metrics && lus.length ? measuredContext(root, r, lus) : null
+  const fichiers = rest.contexte === 'fichier'
+    ? Object.fromEntries(lus.map((p) => [p, headOf(root, r.head, p, Infinity, g)]).filter(([, t]) => t !== null)) : undefined
   return reviewChange({
-    ...rest, diffText, heads, measured, provider,
+    ...rest, diffText, heads, measured, provider, fichiers,
     label: r.label, base: r.base, head: r.head, depot: basename(root), message: messageOf(root, r, g),
   })
 }

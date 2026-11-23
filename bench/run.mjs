@@ -2,7 +2,9 @@
 // LE BANC EN UNE COMMANDE (AM-3) :
 //   node bench/run.mjs [--provider ollama|openai-compatible] [--model <nom>] [--base-url <url>] [--api-key-env <VAR>]
 //                      [--allow-remote] [--repo <nom>=<chemin>]… [--case <id>[,<id>…]] [--retries <n>] [--no-write]
-//                      [--mode brut|revue]
+//                      [--mode brut|revue] [--contexte diff|fichier] [--num-ctx <n>]
+// --contexte fichier (AM-4b, mode revue) : les passes voient aussi le fichier après le changement ; --num-ctx : la fenêtre
+// de contexte d'Ollama (`options.num_ctx`). Le contexte entre dans l'empreinte ; num_ctx est imprimé en tête du passage.
 // --mode brut (défaut) : la question unique d'AM-3 (diff seul). --mode revue (AM-4) : chaque cas passe par
 // `archimetrics review` (src/review : segmentation, examen, filtre de la preuve, contre-vérification) ; autre empreinte.
 // Par défaut : Ollama local (http://127.0.0.1:11434) et qwen3:4b-instruct-2507-q4_K_M, la référence de D-007. Une adresse
@@ -13,7 +15,7 @@
 import { parseArgs } from 'node:util'
 import { createProvider } from '../src/llm/index.mjs'
 import { BENCH_DIR, loadBench, runBench, TABLE_HEADER, tableRow, writeResults } from './lib.mjs'
-import { REVIEW_PROMPT, reviewCase } from './revue.mjs'
+import { reviewCase, reviewPrompt } from './revue.mjs'
 
 const DEFAULT_MODEL = 'qwen3:4b-instruct-2507-q4_K_M'
 
@@ -28,6 +30,8 @@ const OPTIONS = {
   retries: { type: 'string', default: '2' },
   'no-write': { type: 'boolean', default: false },
   mode: { type: 'string', default: 'brut' },
+  contexte: { type: 'string', default: 'diff' },
+  'num-ctx': { type: 'string' },
 }
 
 const line = (s) => `${s.id.padEnd(22)} ${s.formatFinal ? `format ok (${s.essais} essai${s.essais > 1 ? 's' : ''})` : 'format KO'}`
@@ -45,19 +49,35 @@ function parseRepos(list) {
 
 const out = (s) => process.stdout.write(`${s}\n`)
 
-async function main() {
-  const { values: o } = parseArgs({ options: OPTIONS, strict: true })
+/** Le fournisseur des options (après la garde de `createProvider`). */
+function providerOf(o) {
   const spec = { type: o.provider, model: o.model, apiKeyEnv: o['api-key-env'] }
   if (o['base-url']) spec.baseUrl = o['base-url']
-  const provider = createProvider(spec, { allowRemote: o['allow-remote'] })
+  if (o['num-ctx']) spec.options = { num_ctx: Number(o['num-ctx']) }
+  return createProvider(spec, { allowRemote: o['allow-remote'] })
+}
+
+/** Le mode et le contexte, vérifiés : `{ revue, fichier }`. */
+function modeOf(o) {
   if (!['brut', 'revue'].includes(o.mode)) throw new Error(`--mode ${o.mode} : attendu brut ou revue`)
-  const revue = o.mode === 'revue'
-  const bench = loadBench(BENCH_DIR, { repos: parseRepos(o.repo), ...(revue ? { prompt: REVIEW_PROMPT } : {}) })
+  if (!['diff', 'fichier'].includes(o.contexte)) throw new Error(`--contexte ${o.contexte} : attendu diff ou fichier`)
+  if (o.contexte !== 'diff' && o.mode !== 'revue') throw new Error('--contexte fichier : seulement avec --mode revue')
+  return { revue: o.mode === 'revue', fichier: o.contexte === 'fichier' }
+}
+
+async function main() {
+  const { values: o } = parseArgs({ options: OPTIONS, strict: true })
+  const provider = providerOf(o)
+  const { revue, fichier } = modeOf(o)
+  const bench = loadBench(BENCH_DIR, { repos: parseRepos(o.repo), ...(revue ? { prompt: reviewPrompt(o.contexte), apres: fichier } : {}) })
   const only = o.case ? o.case.split(',').map((s) => s.trim()) : undefined
-  out(`banc ${bench.empreinte} · mode ${o.mode} · ${provider.name} · ${provider.model} · ${provider.baseUrl}`)
+  const nofile = fichier ? bench.cas.filter((c) => c.diffText && !Object.keys(c.fichiersApres ?? {}).length).map((c) => c.id) : []
+  const extra = `${revue ? ` · contexte ${o.contexte}` : ''}${o['num-ctx'] ? ` · num_ctx ${o['num-ctx']}` : ''}`
+  out(`banc ${bench.empreinte} · mode ${o.mode}${extra} · ${provider.name} · ${provider.model} · ${provider.baseUrl}`)
+  if (nofile.length) out(`sans fichier après le changement : ${nofile.join(', ')}`)
   const run = await runBench({
-    provider: revue ? { ...provider, name: `${provider.name} (revue)` } : provider, bench, retries: Number(o.retries), only,
-    ...(revue ? { review: reviewCase } : {}),
+    provider: revue ? { ...provider, name: `${provider.name} (revue${fichier ? ', fichier' : ''})` } : provider, bench, retries: Number(o.retries), only,
+    ...(revue ? { review: (p, c, d, r) => reviewCase(p, c, d, r, { contexte: o.contexte }) } : {}),
     onCase: (s) => out(line(s)),
     onSkip: (c) => out(`${c.id.padEnd(22)} sauté : ${c.indisponible}`),
   })

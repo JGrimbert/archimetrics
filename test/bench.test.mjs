@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { caseDiff, extractArgs, gitRead, repoPaths } from '../bench/extract.mjs'
+import { applyHunks, caseAfterFiles, caseDiff, extractArgs, gitRead, repoPaths } from '../bench/extract.mjs'
+import { reviewPrompt } from '../bench/revue.mjs'
+import { parseDiff } from '../src/review/diff.mjs'
 import {
   BENCH_DIR, checkReview, loadBench, messagesFor, norm, REVIEW_SCHEMA, runBench, scoreCase, summarize, tableRow, TABLE_HEADER, writeResults,
 } from '../bench/lib.mjs'
@@ -218,4 +220,28 @@ test('bench/run.mjs : refuse une adresse distante sans --allow-remote, sans rien
   assert.equal(err.status, 1)
   assert.match(err.stderr.toString(), /appel distant refusé vers api\.example\.com.*--allow-remote/)
   assert.equal(err.stdout.toString(), '', 'rien imprimé : refus avant de lire le banc')
+})
+
+test('fichiers après le changement (AM-4b) : blob d\'arrivée par git show, cas reconstitué par application du diff, empreinte', () => {
+  const { root, fix } = fakeRepo()
+  const calls = []
+  const run = (cmd, args, o) => { calls.push(args); return execFileSync(cmd, args, o) }
+  const inv = { id: 'i', depot: 'd', source: { commit: fix.slice(0, 8), mode: 'inverse' }, fichiers: ['f.js'] }
+  const { diffText } = caseDiff(inv, { dir: BENCH_DIR, repos: { d: root } })
+  assert.deepEqual(caseAfterFiles(inv, diffText, { repos: { d: root }, self: root, run }), { 'f.js': "export const css = 'paged.css'\n" })
+  assert.deepEqual(calls.map((a) => a[0]), ['show'])
+  // Sans ligne `index` (cas reconstitué) : le fichier au commit du cas, diff appliqué.
+  const rec = "diff --git a/f.js b/f.js\n--- a/f.js\n+++ b/f.js\n@@ -1 +1,2 @@\n-export const css = '/paged.css'\n+export const css = 'p.css'\n+// ajout\n"
+  assert.deepEqual(caseAfterFiles({ ...inv, source: { commit: fix, mode: 'reconstitué' } }, rec, { repos: { d: root }, self: root }), { 'f.js': "export const css = 'p.css'\n// ajout\n" })
+  assert.deepEqual(caseAfterFiles(inv, diffText, { repos: {}, self: root }), {}, 'dépôt non configuré : rien')
+  assert.equal(applyHunks('a\nb\n', parseDiff(rec)[0].hunks), null, 'avant différent : null')
+  assert.equal(applyHunks('x\ny\nz\nw', parseDiff('diff --git a/q b/q\n@@ -2,2 +2,2 @@\n y\n-z\n+Z\n')[0].hunks), 'x\ny\nZ\nw')
+  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }), '', 'dépôt lu intact')
+  // Empreintes : le mode « revue » sans fichier ne change pas ; avec fichiers, elle change.
+  const diff = loadBench(BENCH_DIR, { repos: NO_SCRIBE, prompt: reviewPrompt() })
+  const file = loadBench(BENCH_DIR, { repos: NO_SCRIBE, prompt: reviewPrompt('fichier'), apres: true })
+  assert.notEqual(diff.empreinte, file.empreinte)
+  assert.ok(Object.keys(file.cas.find((c) => c.id === 'a1-tmpdir-parallele').fichiersApres).includes('test/diff.test.mjs'))
+  assert.ok(file.cas.find((c) => c.id === 'a2-marque-generee').fichiersApres['src/discover/generated.mjs'].includes("new RegExp(String.raw`(@generated\\b)`)"))
+  assert.equal(diff.cas[0].fichiersApres, undefined)
 })

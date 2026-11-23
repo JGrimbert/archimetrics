@@ -10,7 +10,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { completeJson } from '../src/llm/index.mjs'
-import { caseDiff, repoPaths } from './extract.mjs'
+import { caseAfterFiles, caseDiff, repoPaths } from './extract.mjs'
 
 export const BENCH_DIR = fileURLToPath(new URL('.', import.meta.url))
 export const PROMPT_VERSION = 'revue-1'
@@ -58,14 +58,17 @@ const SYSTEM = [
  * @param {string} [dir]
  * @param {{ repos?: Record<string, string>, run?: Function }} [o]
  */
-export function loadBench(dir = BENCH_DIR, { repos, run, prompt = { version: PROMPT_VERSION, text: SYSTEM } } = {}) {
+export function loadBench(dir = BENCH_DIR, { repos, run, prompt = { version: PROMPT_VERSION, text: SYSTEM }, apres = false } = {}) {
   const bench = JSON.parse(readFileSync(join(dir, 'cas.json'), 'utf8'))
   const paths = repoPaths(dir, repos)
   const hash = createHash('sha256').update(prompt.version).update(prompt.text).update(JSON.stringify(bench.depots))
   const cas = bench.cas.map((c) => {
     const got = caseDiff(c, { dir, repos: paths, run })
     hash.update(JSON.stringify([c.id, c.depot, c.attendu, c.constats])).update(got.diffText ?? `(indisponible ${c.id})`)
-    return { ...c, diffText: got.diffText ?? null, indisponible: got.indisponible ?? null }
+    // `apres` (AM-4b, --contexte fichier) : les fichiers après le changement, qui entrent aussi dans l'empreinte.
+    const fichiersApres = apres && got.diffText ? caseAfterFiles(c, got.diffText, { repos: paths, self: join(dir, '..'), run }) : undefined
+    if (fichiersApres) hash.update(JSON.stringify(Object.entries(fichiersApres).sort()))
+    return { ...c, diffText: got.diffText ?? null, indisponible: got.indisponible ?? null, ...(fichiersApres ? { fichiersApres } : {}) }
   })
   const partiel = cas.some((c) => c.indisponible) ? '-partiel' : ''
   return { depots: bench.depots, cas, empreinte: hash.digest('hex').slice(0, 8) + partiel }
