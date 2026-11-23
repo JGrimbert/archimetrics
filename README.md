@@ -40,6 +40,40 @@ branche par défaut : en plus, le rapport est publié sur la branche `metriques`
 Entrées : `root`, `config`, `branch` (`metriques`), `publish` (`auto` | `true` | `false`), `check` (`true`),
 `setup-node` (`true`), `artifact` (`true`).
 
+## Versions : l'étiquette `v1`
+
+La ligne `uses: JGrimbert/archimetrics@v1` ne prend pas la dernière version du code. Elle prend le commit qui porte
+l'**étiquette** (le *tag*) `v1`, un marque-page posé sur un commit précis. Sans cette étiquette sur GitHub, le job du
+projet échoue : GitHub ne trouve rien à exécuter.
+
+L'intérêt : on travaille sur archimetrics sans casser les projets qui l'emploient. Les nouveaux commits ne déplacent
+pas l'étiquette, et les projets gardent la version étiquetée tant qu'on ne l'a pas déplacée.
+
+**Première fois**, après le premier commit poussé :
+
+```
+git tag v1              # pose l'étiquette v1 sur le dernier commit (en local)
+git push origin v1      # l'envoie sur GitHub (un simple `git push` n'envoie pas les étiquettes)
+```
+
+Sur GitHub, le sélecteur de branches a un onglet **Tags** qui doit afficher `v1`.
+
+**Quand une nouvelle version est prête** (tests passés, essayée en local sur un projet) :
+
+```
+git tag -f v1           # déplace l'étiquette sur le dernier commit (-f : elle existe déjà, Git refuserait sinon)
+git push -f origin v1   # remplace celle de GitHub
+```
+
+Seule l'étiquette bouge : l'historique des commits reste le même. Au prochain passage de leur CI, les projets prennent
+la nouvelle version.
+
+**Un changement qui casse** l'usage (une option renommée, un format de baseline modifié) : poser plutôt une nouvelle
+étiquette `v2`, et passer chaque projet de `@v1` à `@v2` quand il est prêt.
+
+**Sans étiquette** : `uses: JGrimbert/archimetrics@main` prend toujours la dernière version, même inachevée.
+C'est plus simple, mais un commit en cours sur archimetrics peut alors faire échouer la CI d'un projet.
+
 ## En local, sans rien installer dans le projet
 
 ```
