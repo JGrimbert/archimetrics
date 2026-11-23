@@ -1,0 +1,50 @@
+{
+  "note": "Violations tolérées par archimetrics (une clé par violation). La liste ne fait que rétrécir : une violation corrigée en sort, une nouvelle ne s’y ajoute que par décision (archimetrics baseline).",
+  "rules": {
+    "functionLines": [
+      "src/analyze/script.mjs#analyzeClass",
+      "src/analyze/script.mjs#analyzeScript",
+      "src/analyze/script.mjs#visit#2",
+      "src/metrics/coupling.mjs#couplingMetrics",
+      "src/metrics/duplication.mjs#duplicationMetrics",
+      "src/metrics/index.mjs#collect",
+      "src/report/markdown.mjs#pages",
+      "src/report/mermaid.mjs#diagrams"
+    ],
+    "cyclomatic": [
+      "src/analyze/python_analyzer.py#Measure.walk",
+      "src/analyze/python_analyzer.py#lcom4",
+      "src/analyze/script.mjs#analyzeClass",
+      "src/analyze/script.mjs#visit#2",
+      "src/analyze/script.mjs#visitTokens",
+      "src/analyze/script.mjs#walk",
+      "src/graph.mjs#cycles",
+      "src/metrics/coupling.mjs#couplingMetrics",
+      "src/metrics/duplication.mjs#duplicationMetrics",
+      "src/metrics/organisation.mjs#organisationMetrics",
+      "src/report/mermaid.mjs#diagrams",
+      "src/report/mermaid.mjs#prismaErd"
+    ],
+    "cognitive": [
+      "src/analyze/index.mjs#analyzeFiles",
+      "src/analyze/python_analyzer.py#Measure.walk",
+      "src/analyze/python_analyzer.py#lcom4",
+      "src/analyze/script.mjs#analyzeClass",
+      "src/analyze/script.mjs#visit#2",
+      "src/analyze/script.mjs#walk",
+      "src/analyze/vue.mjs#nonCommentLines",
+      "src/graph.mjs#buildGraph",
+      "src/graph.mjs#cycles",
+      "src/graph.mjs#resolve",
+      "src/graph.mjs#resolvePy",
+      "src/metrics/coupling.mjs#couplingMetrics",
+      "src/metrics/duplication.mjs#duplicationMetrics",
+      "src/metrics/organisation.mjs#organisationMetrics",
+      "src/report/mermaid.mjs#diagrams",
+      "src/report/mermaid.mjs#prismaErd"
+    ],
+    "nesting": [
+      "src/metrics/duplication.mjs#duplicationMetrics"
+    ]
+  }
+}
