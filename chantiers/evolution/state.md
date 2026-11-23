@@ -1,6 +1,6 @@
 # Chantier « évolution » d'ArchiMetrics — état
 
-> Vérifié le **2026-11-23** : AM-0, AM-1 et AM-2 fusionnés dans `main` (AM-2 validé, code `c82f829`) ; AM-3 livré sur `lot/AM-3`, à valider ; `v1` sur `68392ca`.
+> Vérifié le **2026-11-23** : AM-0 à AM-3 fusionnés dans `main` (AM-3 validé, code `25e665d`) ; `v1` sur `68392ca`.
 > Cible du chantier : Phase 2 de `C:\jgr\archi\ARCHI_ROADMAP.md` (lots AM-0 à AM-6). Plan interne : [roadmap.md](roadmap.md).
 > Statuts : [CONSTAT] (fichier cité), [INTERPRÉTATION], [HYPOTHÈSE], [À VÉRIFIER].
 
@@ -20,7 +20,7 @@
   poussé ; l'étiquette `v1` n'a pas bougé) : découverte zero config (`src/discover/`), champs
   `origine` / `confiance` / `indices`, avertissement de D-020. Détail et preuves : « Découverte vérifiée (AM-2) »
   ci-dessous. `npm test` : **35 tests verts** ; `check --root . --no-git` : 0 violation nouvelle, 37 tolérées.
-- **AM-3 fait, à valider** (`lot/AM-3`, non fusionné) : `src/llm/` (interface fournisseur, Ollama, compatible OpenAI,
+- **AM-3 fait, validé par l'auteur et fusionné dans `main`** le 2026-11-23 (avance rapide depuis `lot/AM-3`, non poussé) : `src/llm/` (interface fournisseur, Ollama, compatible OpenAI,
   JSON validé + réessai, garde `--allow-remote`) et banc `bench/` (10 diffs, `node bench/run.mjs`). Détail et mesures :
   « Banc de revue (AM-3) » ci-dessous. `npm test` : **56 tests verts** ; `check --root .` : 0 violation nouvelle, 37 tolérées.
 - **Prochain lot** : AM-4 (`archimetrics review`, sur le banc d'AM-3) ou AM-5 (restitution, avec D-021), au choix de
@@ -246,3 +246,5 @@ _Aucune en attente._
   banc ramenées à LF (empreinte stable sous `core.autocrlf`). D-034 (b) appliquée avant tout push : diffs de scribe
   extraits à la volée, et commits du lot refaits pour qu'aucun ne contienne d'extrait de scribe. Ni push ni fusion : à
   valider par l'auteur.
+- **2026-11-23** — AM-3 validé par l'auteur ; `lot/AM-3` fusionné dans `main` par avance rapide (56 tests verts, 0 violation
+  nouvelle, `archi verify` ok sur la pointe du lot) ; rien de poussé ; `v1` inchangée.
