@@ -22,7 +22,7 @@
 - **Prochain lot** : AM-3 (adaptateurs LLM), au choix de l'auteur ; fiche `lots/AM-2.md` d'`archi` à passer à « fait »
   (hors de ce dépôt, non touchée).
 - **DS-4 acceptée** (option (b), 2026-11-23) : relevé de découverte en champ `discovery` de premier niveau et page
-  « Découverte » du rapport, avec AM-5 ; à reporter dans `ARCHI_DECISIONS.md`.
+  « Découverte » du rapport, avec AM-5 ; reportée : D-021.
 - `chantiers/ecosysteme/` (dossier vide) supprimé par `rmdir` [CONSTAT].
 - **Baseline** : `node bin/archimetrics.mjs check --root . --no-git` relève **37 violations**, comme attendu (aucun
   écart avec 37) [CONSTAT] : `functionLines` 8, `cyclomatic` 12, `cognitive` 16, `nesting` 1. Elles sont toutes
@@ -146,7 +146,7 @@ _Aucune en attente._
 
 ## Décisions tranchées
 
-### DS-4 — Où publier le relevé de découverte dans `metrics.json` — **acceptée : option (b)** (à reporter dans `ARCHI_DECISIONS.md`)
+### DS-4 — Où publier le relevé de découverte dans `metrics.json` — **tranchée : D-021, option (b)**
 - **Décision** : acceptée par l'auteur le 2026-11-23, option **(b)** : un champ de premier niveau `discovery`
   (facultatif, `archimetrics.metrics/1` inchangé) et une page « Découverte » dans le rapport Markdown. **À livrer avec
   AM-5** (dont le périmètre devra inclure `src/metrics/index.mjs` et `src/report/markdown.mjs`), sauf lot dédié décidé
@@ -204,4 +204,4 @@ _Aucune en attente._
   (champs facultatifs) ; README. Essais sur scribe, CC, jgr-ui (copies hors dépôt). `npm test` 35/35 ; `check` : 0
   violation nouvelle, 37 tolérées. DS-4 proposée.
 - **2026-11-23** — DS-4 acceptée par l'auteur, option (b) : `discovery` de premier niveau et page « Découverte », avec
-  AM-5 (à reporter dans `ARCHI_DECISIONS.md`).
+  AM-5 ; reportée dans `ARCHI_DECISIONS.md` : D-021.
