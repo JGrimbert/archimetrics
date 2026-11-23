@@ -1,14 +1,13 @@
 # Chantier « évolution » d'ArchiMetrics — état
 
-> Vérifié le **2026-11-23** : sur **`68392ca`** (`main`, étiquette `v1`), AM-0 et AM-1 fusionnés ; audit fait sur
-> `bcb1e3f`.
+> Vérifié le **2026-11-23** : **`68392ca`** (`main`, étiquette `v1`), AM-0 et AM-1 fusionnés (audit fait sur `bcb1e3f`).
 > Cible du chantier : Phase 2 de `C:\jgr\archi\ARCHI_ROADMAP.md` (lots AM-0 à AM-6). Plan interne : [roadmap.md](roadmap.md).
 > Statuts : [CONSTAT] (fichier cité), [INTERPRÉTATION], [HYPOTHÈSE], [À VÉRIFIER].
 
 ## Où en est-on
 
 - **AM-0 fait** : audit ci-dessous, [roadmap.md](roadmap.md), baseline initiale ; roadmap, DS-1 et DS-2 **acceptées par
-  l'auteur le 2026-11-23** (à reporter dans `ARCHI_DECISIONS.md`).
+  l'auteur le 2026-11-23** (reportées : D-018, D-019).
 - **AM-0 et AM-1 fusionnés dans `main`** (`68392ca`, étiquette `v1`) [CONSTAT `git log`, `git tag --points-at`].
 - **AM-1 fait** : `schemaVersion: "archimetrics.metrics/1"`, `schemas/metrics.schema.json`
   et `schemas/metrics-diff.schema.json`, validateur `src/schema.mjs`, `archimetrics diff` (deux fichiers, ou
@@ -87,7 +86,11 @@ même avant et après la session [CONSTAT] :
   (`backend/src/edition/edit-nodes.ts#moveNodeOps`, `cyclomatic` et `cognitive`), dans un fichier non commité de son
   travail en cours.
 
-## Décisions soumises
+## Décisions à soumettre
+
+_Aucune en attente._
+
+## Décisions tranchées
 
 ### DS-3 — Configuration employée par `diff --base` — **tranchée : D-020, option (c)**
 - **Décision** : D-020 (validée) retient **(c)** : chaque côté garde sa configuration ; un avertissement est émis quand
@@ -101,7 +104,7 @@ même avant et après la session [CONSTAT] :
   l'histoire), et l'avertissement signale le cas où la comparaison mélange deux lunettes. Petit ajout, pour AM-2 qui
   touche à la config.
 
-### DS-1 — Forme garantie de `violations` dans `metrics.json` v1 (à reporter dans `ARCHI_DECISIONS.md`)
+### DS-1 — Forme garantie de `violations` dans `metrics.json` v1 — **tranchée : D-018, option (a)**
 - **Contexte** : P2 décrit `violations` comme « règle → liste de clés » ; le code produit « règle → liste d'objets »
   `{ key, value, limit, detail }` [CONSTAT].
 - **Options** : (a) **garantir des objets dont seul `key` (chaîne) est requis** ; `value`, `limit`, `detail` décrits,
@@ -110,7 +113,7 @@ même avant et après la session [CONSTAT] :
 - **Recommandation** : **(a)**. Aucune sortie ne change ; le diff et la baseline n'ont besoin que de `key` ; `value` et
   `detail` peuvent encore évoluer (ex. `detail: "ligne 16"` → numéro de ligne) sans passer à `/2`.
 
-### DS-2 — Champs garantis de `groups` (même report)
+### DS-2 — Champs garantis de `groups` — **tranchée : D-019, option (a)**
 - **Options** : (a) **garantir `name` et `path` (chaînes), décrire `files`, `codeLines`, `functions`, `complexity`
   (entiers) comme garantis aussi** — ils existent depuis 0.1 et le diff par groupe en a besoin ; (b) ne garantir que
   `name` et `path`.
