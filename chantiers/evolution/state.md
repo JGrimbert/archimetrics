@@ -1,6 +1,6 @@
 # Chantier « évolution » d'ArchiMetrics — état
 
-> Vérifié le **2026-11-23** : AM-2 sur `lot/AM-2` (non fusionné), parti de `68392ca` (`main`, `v1`, AM-0 et AM-1 fusionnés).
+> Vérifié le **2026-11-23** : AM-0, AM-1 et AM-2 fusionnés dans `main` (AM-2 validé, code `c82f829`) ; `v1` sur `68392ca`.
 > Cible du chantier : Phase 2 de `C:\jgr\archi\ARCHI_ROADMAP.md` (lots AM-0 à AM-6). Plan interne : [roadmap.md](roadmap.md).
 > Statuts : [CONSTAT] (fichier cité), [INTERPRÉTATION], [HYPOTHÈSE], [À VÉRIFIER].
 
@@ -16,11 +16,12 @@
 - **DS-3 tranchée par D-020** (validée, option (c)) : chaque côté de `diff --base` garde sa configuration, avec un
   avertissement si elles diffèrent ; à livrer dans AM-2.
 - **D-020 livrée dans AM-2** : `diff --base` avertit quand les deux configurations déclarées diffèrent (voir AM-2).
-- **AM-2 fait sur `lot/AM-2`** (non fusionné, non poussé) : découverte zero config (`src/discover/`), champs
+- **AM-2 fait, validé par l'auteur et fusionné dans `main`** le 2026-11-23 (avance rapide depuis `lot/AM-2`, non
+  poussé ; l'étiquette `v1` n'a pas bougé) : découverte zero config (`src/discover/`), champs
   `origine` / `confiance` / `indices`, avertissement de D-020. Détail et preuves : « Découverte vérifiée (AM-2) »
   ci-dessous. `npm test` : **35 tests verts** ; `check --root . --no-git` : 0 violation nouvelle, 37 tolérées.
-- **Prochain lot** : AM-3 (adaptateurs LLM), au choix de l'auteur ; fiche `lots/AM-2.md` d'`archi` à passer à « fait »
-  (hors de ce dépôt, non touchée).
+- **Prochain lot** : AM-3 (adaptateurs LLM) ou AM-5 (restitution, avec D-021), au choix de l'auteur ; fiche
+  `lots/AM-2.md` d'`archi` : « validé ».
 - **DS-4 acceptée** (option (b), 2026-11-23) : relevé de découverte en champ `discovery` de premier niveau et page
   « Découverte » du rapport, avec AM-5 ; reportée : D-021.
 - `chantiers/ecosysteme/` (dossier vide) supprimé par `rmdir` [CONSTAT].
@@ -205,3 +206,5 @@ _Aucune en attente._
   violation nouvelle, 37 tolérées. DS-4 proposée.
 - **2026-11-23** — DS-4 acceptée par l'auteur, option (b) : `discovery` de premier niveau et page « Découverte », avec
   AM-5 ; reportée dans `ARCHI_DECISIONS.md` : D-021.
+- **2026-11-23** — AM-2 validé par l'auteur ; `lot/AM-2` fusionné dans `main` par avance rapide (35 tests verts, 0
+  violation nouvelle sur la pointe du lot) ; rien de poussé ; `v1` inchangée.
