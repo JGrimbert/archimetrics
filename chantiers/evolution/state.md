@@ -1,7 +1,7 @@
 # Chantier « évolution » d'ArchiMetrics — état
 
-> Vérifié le **2026-11-23** : AM-0 à AM-3 fusionnés dans `main` (AM-3 validé, code `25e665d`) ; AM-4 livré sur
-> `lot/AM-4`, à valider ; `v1` sur `68392ca`.
+> Vérifié le **2026-11-23** : AM-0 à AM-3 fusionnés dans `main` (AM-3 validé, code `25e665d`) ; AM-4 validé et
+> fusionné dans `main` (code `86be015`) ; `v1` sur `68392ca`.
 > Cible du chantier : Phase 2 de `C:\jgr\archi\ARCHI_ROADMAP.md` (lots AM-0 à AM-6). Plan interne : [roadmap.md](roadmap.md).
 > Statuts : [CONSTAT] (fichier cité), [INTERPRÉTATION], [HYPOTHÈSE], [À VÉRIFIER].
 
@@ -24,11 +24,12 @@
 - **AM-3 fait, validé par l'auteur et fusionné dans `main`** le 2026-11-23 (avance rapide depuis `lot/AM-3`, non poussé) : `src/llm/` (interface fournisseur, Ollama, compatible OpenAI,
   JSON validé + réessai, garde `--allow-remote`) et banc `bench/` (10 diffs, `node bench/run.mjs`). Détail et mesures :
   « Banc de revue (AM-3) » ci-dessous. `npm test` : **56 tests verts** ; `check --root .` : 0 violation nouvelle, 37 tolérées.
-- **AM-4 livré sur `lot/AM-4`, à valider** (2026-11-23, non fusionné, non poussé) : `archimetrics review` (`src/review/`,
+- **AM-4 fait, validé par l'auteur et fusionné dans `main`** le 2026-11-23 (avance rapide depuis `lot/AM-4`, non
+  poussé), critère du banc non tenu au sens de D-035 (validée, (a) + (c)) : `archimetrics review` (`src/review/`,
   `schemas/review.schema.json`, mode `--mode revue` du banc). Détail et mesures : « Revue (AM-4) » ci-dessous.
-  `npm test` : **69 tests verts** ; `check --root .` : 0 violation nouvelle, 37 tolérées. Critère du banc : voir D-035
-  (proposée) dans `C:\jgrrchi\ARCHI_DECISIONS.md`.
-- **Prochain lot** : AM-5 (restitution, avec D-021), ou le rappel de la revue (D-035 (c)), au choix de l'auteur.
+  `npm test` : **69 tests verts** ; `check --root .` : 0 violation nouvelle, 37 tolérées. Critère du banc : D-035 (validée)
+  dans `C:\jgrrchi\ARCHI_DECISIONS.md` ; la revue LLM n'est qu'un avis non bloquant jusqu'à AM-4b.
+- **Prochain lot** : AM-4b (rappel de la revue, D-035 (c)) ; AM-5 (restitution, avec D-021) au choix de l'auteur.
 - **DS-4 acceptée** (option (b), 2026-11-23) : relevé de découverte en champ `discovery` de premier niveau et page
   « Découverte » du rapport, avec AM-5 ; reportée : D-021.
 - `chantiers/ecosysteme/` (dossier vide) supprimé par `rmdir` [CONSTAT].
@@ -208,7 +209,7 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
   78 s, 1 826) : 3 à 5 appels par cas.
 - [INTERPRÉTATION] Les filtres tiennent la précision, mais Qwen 4B ne trouve presque plus rien : le critère « ≤ 1 faux
   sur 5 » est tenu ou non selon le passage, sur 1 ou 2 constats. La relecture du constat compté faux (a1) en montre le
-  bon mécanisme. Comment juger le critère et où chercher le rappel : **D-035** (proposée). Variantes essayées et
+  bon mécanisme. Comment juger le critère et où chercher le rappel : **D-035** (validée, (a) + (c) : 3 passages au moins, plancher de rappel ; AM-4b). Variantes essayées et
   abandonnées : champ « conclusion » en tête (`7ad80874`, muet), une seule contre-vérification (`598da884`, 3/5 faux ;
   `26e27538`, 2/3), avant/après aussi à l'examen (`5801ea3f`, muet).
 - Limites [CONSTAT] : les fichiers non-code (Markdown) passent aussi par le LLM ; au-delà de `--max-segments` (40), les
