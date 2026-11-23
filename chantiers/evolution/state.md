@@ -1,6 +1,7 @@
 # Chantier « évolution » d'ArchiMetrics — état
 
-> Vérifié le **2026-11-23** : audit sur **`bcb1e3f`** (`main`) ; état d'AM-1 sur `lot/AM-1` (partie de `03177a2`).
+> Vérifié le **2026-11-23** : sur **`68392ca`** (`main`, étiquette `v1`), AM-0 et AM-1 fusionnés ; audit fait sur
+> `bcb1e3f`.
 > Cible du chantier : Phase 2 de `C:\jgr\archi\ARCHI_ROADMAP.md` (lots AM-0 à AM-6). Plan interne : [roadmap.md](roadmap.md).
 > Statuts : [CONSTAT] (fichier cité), [INTERPRÉTATION], [HYPOTHÈSE], [À VÉRIFIER].
 
@@ -8,11 +9,14 @@
 
 - **AM-0 fait** : audit ci-dessous, [roadmap.md](roadmap.md), baseline initiale ; roadmap, DS-1 et DS-2 **acceptées par
   l'auteur le 2026-11-23** (à reporter dans `ARCHI_DECISIONS.md`).
-- **AM-1 fait sur `lot/AM-1`** (non fusionné) : `schemaVersion: "archimetrics.metrics/1"`, `schemas/metrics.schema.json`
+- **AM-0 et AM-1 fusionnés dans `main`** (`68392ca`, étiquette `v1`) [CONSTAT `git log`, `git tag --points-at`].
+- **AM-1 fait** : `schemaVersion: "archimetrics.metrics/1"`, `schemas/metrics.schema.json`
   et `schemas/metrics-diff.schema.json`, validateur `src/schema.mjs`, `archimetrics diff` (deux fichiers, ou
   `--base <ref> [--head <ref>] [--config f]`), règle de compatibilité dans `README.md`. Détail et preuves :
   « Comparaison vérifiée sur scribe » ci-dessous. `npm test` : **26 tests verts** (15 au départ).
-- **Prochain lot** : AM-2 (découverte zero config) ou AM-3 (adaptateurs LLM), au choix de l'auteur ; DS-3 à trancher.
+- **DS-3 tranchée par D-020** (validée, option (c)) : chaque côté de `diff --base` garde sa configuration, avec un
+  avertissement si elles diffèrent ; à livrer dans AM-2.
+- **Lot en cours** : AM-2 (découverte zero config), avec l'avertissement de D-020.
 - `chantiers/ecosysteme/` (dossier vide) supprimé par `rmdir` [CONSTAT].
 - **Baseline** : `node bin/archimetrics.mjs check --root . --no-git` relève **37 violations**, comme attendu (aucun
   écart avec 37) [CONSTAT] : `functionLines` 8, `cyclomatic` 12, `cognitive` 16, `nesting` 1. Elles sont toutes
@@ -83,9 +87,11 @@ même avant et après la session [CONSTAT] :
   (`backend/src/edition/edit-nodes.ts#moveNodeOps`, `cyclomatic` et `cognitive`), dans un fichier non commité de son
   travail en cours.
 
-## Décisions à soumettre
+## Décisions soumises
 
-### DS-3 — Configuration employée par `diff --base` (à reporter dans `ARCHI_DECISIONS.md`)
+### DS-3 — Configuration employée par `diff --base` — **tranchée : D-020, option (c)**
+- **Décision** : D-020 (validée) retient **(c)** : chaque côté garde sa configuration ; un avertissement est émis quand
+  les deux configurations diffèrent. **À livrer dans AM-2** (pas encore codé).
 - **Contexte** : une révision ancienne peut ne pas avoir la config actuelle (cas réel : scribe ci-dessus). Mesurée avec
   sa propre config, elle n'est pas vue avec les mêmes alias, groupes et seuils que l'autre côté.
 - **Options** : (a) **chaque côté sa config** (comportement livré), `--config` pour imposer la même ; (b) par défaut,
@@ -120,3 +126,5 @@ même avant et après la session [CONSTAT] :
   inventaire `files` (non garanti) ajouté à `metrics.json` pour les fichiers apparus / disparus ; extraction de
   `git archive` par un lecteur tar minimal (`src/tar.mjs`, pas de dépendance au `tar` du système) ; `--config` ajouté à
   `diff --base` (DS-3). `npm test` 26/26 ; `check --root . --no-git` : 0 violation nouvelle, 37 tolérées.
+- **2026-11-23** — AM-0 et AM-1 fusionnés dans `main` (`68392ca`, étiquette `v1`). DS-3 tranchée par D-020 (option (c),
+  avertissement à livrer dans AM-2). Prochain lot : AM-2.
