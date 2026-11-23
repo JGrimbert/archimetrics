@@ -1,6 +1,6 @@
 # Chantier « évolution » d'ArchiMetrics — état
 
-> Vérifié le **2026-11-23** : AM-0, AM-1 et AM-2 fusionnés dans `main` (AM-2 validé, code `c82f829`) ; `v1` sur `68392ca`.
+> Vérifié le **2026-11-23** : AM-0, AM-1 et AM-2 fusionnés dans `main` (AM-2 validé, code `c82f829`) ; AM-3 livré sur `lot/AM-3`, à valider ; `v1` sur `68392ca`.
 > Cible du chantier : Phase 2 de `C:\jgr\archi\ARCHI_ROADMAP.md` (lots AM-0 à AM-6). Plan interne : [roadmap.md](roadmap.md).
 > Statuts : [CONSTAT] (fichier cité), [INTERPRÉTATION], [HYPOTHÈSE], [À VÉRIFIER].
 
@@ -20,8 +20,11 @@
   poussé ; l'étiquette `v1` n'a pas bougé) : découverte zero config (`src/discover/`), champs
   `origine` / `confiance` / `indices`, avertissement de D-020. Détail et preuves : « Découverte vérifiée (AM-2) »
   ci-dessous. `npm test` : **35 tests verts** ; `check --root . --no-git` : 0 violation nouvelle, 37 tolérées.
-- **Prochain lot** : AM-3 (adaptateurs LLM) ou AM-5 (restitution, avec D-021), au choix de l'auteur ; fiche
-  `lots/AM-2.md` d'`archi` : « validé ».
+- **AM-3 fait, à valider** (`lot/AM-3`, non fusionné) : `src/llm/` (interface fournisseur, Ollama, compatible OpenAI,
+  JSON validé + réessai, garde `--allow-remote`) et banc `bench/` (10 diffs, `node bench/run.mjs`). Détail et mesures :
+  « Banc de revue (AM-3) » ci-dessous. `npm test` : **56 tests verts** ; `check --root .` : 0 violation nouvelle, 37 tolérées.
+- **Prochain lot** : AM-4 (`archimetrics review`, sur le banc d'AM-3) ou AM-5 (restitution, avec D-021), au choix de
+  l'auteur.
 - **DS-4 acceptée** (option (b), 2026-11-23) : relevé de découverte en champ `discovery` de premier niveau et page
   « Découverte » du rapport, avec AM-5 ; reportée : D-021.
 - `chantiers/ecosysteme/` (dossier vide) supprimé par `rmdir` [CONSTAT].
@@ -44,7 +47,7 @@
 | Niveaux observé / inféré / déclaré | **absent** | [CONSTAT] aucune occurrence de `origine` ni `confiance` dans `src/` | Tout : champ `origine`, `confiance`, `indices` sur groupes et modules |
 | Contrat JSON | **partiel** → **existant** après AM-1 | [CONSTAT] `src/report/index.mjs:47` écrit `metrics.json` (`tool`, `name`, `date`, `commit`, `limits`, `summary`, `groups`, `sizes`, `functions`, `organisation`, `coupling`, `duplication`, `history`, `violations`, `warnings`, `durationMs`, `baselinePath`, `check`) | `schemaVersion`, schéma publié, règle de compatibilité, test de non-régression du format |
 | Comparaison avant / après | **partiel** → **existant** après AM-1 | [CONSTAT] `src/baseline.mjs` `compare` (violations face à la baseline) ; `report/index.mjs:34-36` (`history.json`, `summary` du relevé précédent montré dans le rapport) | Comparaison entre **deux relevés** ou **deux commits** (`archimetrics diff`, `--base`), écart par groupe, fichiers apparus / disparus |
-| Revue LLM | **absent** | [CONSTAT] aucun appel réseau ni module `src/llm/` ; aucune commande `review` dans `bin/archimetrics.mjs` | Tout (AM-3, AM-4) |
+| Revue LLM | **absent** → adaptateurs et banc après AM-3 | [CONSTAT] aucun appel réseau ni module `src/llm/` ; aucune commande `review` dans `bin/archimetrics.mjs` | Tout (AM-3, AM-4) |
 | Restitution en quatre niveaux | **partiel** | [CONSTAT] `src/report/markdown.mjs` : `README.md` (accueil), puis pages thématiques `taille`, `complexite`, `couplage`, `redondances`, `organisation`, `historique` ; `svg.mjs`, `mermaid.mjs` | [INTERPRÉTATION] l'accueil tient lieu de vue d'ensemble et les pages thématiques d'exploration ; **absents** : « points d'attention » hiérarchisés et « recommandations » (aucune occurrence dans `src/report`) |
 | Autodiagnostic | **partiel** | [CONSTAT] `warnings` (`src/analyze/index.mjs` : fichier illisible, analyse en échec, Python absent) ; `sizes.byLang` (`src/metrics/sizes.mjs`) ; `npm run self` et la CI passent l'outil sur lui-même | Constructions non reconnues (imports calculés, `require` dynamiques…), limites connues dans le JSON (elles ne sont que dans `README.md` §« Limites connues »), couplage interne d'ArchiMetrics commenté |
 
@@ -141,6 +144,35 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
   `os.tmpdir()` ; l'analyseur Python (`src/analyze/python.mjs`) y crée aussi des dossiers `archimetrics-*` et le nouveau
   `test/discover.test.mjs` (qui analyse du Python) tourne en parallèle. Le test ne regarde plus que les dossiers nouveaux.
 
+## Banc de revue (AM-3)
+
+- **Adaptateurs** [CONSTAT] `src/llm/` : `createProvider(spec, { allowRemote })` (seule porte d'entrée) choisit `ollama`
+  (`POST /api/chat`, schéma dans `format`, température 0, graine 42) ou `openai-compatible` (`POST <base>/chat/completions`,
+  `response_format` `json_schema`, clé lue dans la variable nommée par `apiKeyEnv`) ; `completeJson` extrait le JSON
+  (clôture Markdown, `<think>`), valide par `src/schema.mjs` plus un contrôle de cohérence, et réessaie (2 fois par défaut)
+  en rendant les erreurs au modèle. `fetch` natif, aucune dépendance.
+- **Garde** [CONSTAT] `test/llm.test.mjs`, `test/bench.test.mjs` : une adresse hors boucle locale (`localhost`, `*.localhost`,
+  `127.x`, `::1`) lève `RemoteRefusedError` avant toute requête ; avec `allowRemote`, une ligne « appel distant autorisé
+  (--allow-remote) vers <hôte> » sur la sortie d'erreur, sans la clé ; `node bench/run.mjs --base-url https://…` sort en
+  code 1 sans rien lire. Les tests piègent le `fetch` global (0 appel) et injectent de faux `fetch`.
+- **Banc** [CONSTAT] `bench/cas.json` : 5 défauts (4 correctifs renversés : scribe `ffc41a81`, `22926469`, `6ad6a8e0`,
+  ArchiMetrics `c82f829` ; 1 reconstitué d'après le journal d'AM-2) et 5 commits sains ; diffs extraits par `git show` /
+  `git diff` (lecture seule). **D-034** (validée, option (b) : ArchiMetrics est public, scribe privé) : seuls les 3 diffs
+  d'ArchiMetrics sont figés dans `bench/cas/` ; les 7 de scribe ne sont versionnés que par leur référence (commit, mode,
+  fichiers) et extraits à la volée, en mémoire (`bench/extract.mjs`, `git show` / `git diff` seulement), du dépôt nommé
+  par `--repo` ou `bench/depots.local.json` (ignoré) ; sans scribe, ses cas sont sautés (« partiel »). Les détails des
+  passages (`bench/resultats/`, qui citent le code) sont ignorés par Git. `git status` de scribe identique avant et après.
+- **Mesure de Qwen** [CONSTAT] `bench/resultats.md`, `qwen3:4b-instruct-2507-q4_K_M` sur Ollama local, banc `778e1cf7`
+  (diffs extraits identiques octet pour octet aux diffs figés du banc `87b36ae4`, vérifié), 6 passages. **À chaud**
+  (4 passages identiques) : format **10/10 au 1er essai**, défauts trouvés **2/5** (s1, a2), cas sains conclus « rien »
+  **2/5** (s4, s6), constats faux **8/11**, latence médiane **7,6–7,8 s**, max 21–22 s, **78–79 s** pour le banc, 1 826
+  jetons de sortie. **Premier passage après chargement du modèle** (2 passages identiques entre eux, avec ou sans graine) :
+  a1 trouvé en plus (3/5), 7/12 faux, 2 042 jetons. La graine fixe (42) ne supprime donc pas cet écart. Relu à la main : la notation par mots-clés est
+  indulgente (a2 trouvé avec un raisonnement en partie faux) ; les constats sur a3 sont faux (lecture erronée du code).
+- [INTERPRÉTATION] Qwen 4B, diff seul, est loin du critère d'AM-4 (≤ 1 constat faux sur 5) : la revue devra lui donner du
+  contexte (fichier entier, voisins, métriques), segmenter, et filtrer les constats (preuve exigée, gravité), et la
+  partie déterministe porter l'essentiel. Le banc mesure ces progrès à empreinte égale.
+
 ## Décisions à soumettre
 
 _Aucune en attente._
@@ -208,3 +240,9 @@ _Aucune en attente._
   AM-5 ; reportée dans `ARCHI_DECISIONS.md` : D-021.
 - **2026-11-23** — AM-2 validé par l'auteur ; `lot/AM-2` fusionné dans `main` par avance rapide (35 tests verts, 0
   violation nouvelle sur la pointe du lot) ; rien de poussé ; `v1` inchangée.
+- **2026-11-23** — AM-3 sur `lot/AM-3` (depuis `main`, `b972799`) : `src/llm/` (`provider`, `ollama`, `openai-compatible`,
+  `http`, `json`, `index`) ; `bench/` (`cas.json`, 10 diffs, `lib.mjs`, `run.mjs`, `README.md`, `resultats.md`) ; tests
+  `llm.test.mjs` et `bench.test.mjs`. `npm test` 56/56 ; `check` : 0 violation nouvelle, 37 tolérées. Fins de ligne du
+  banc ramenées à LF (empreinte stable sous `core.autocrlf`). D-034 (b) appliquée avant tout push : diffs de scribe
+  extraits à la volée, et commits du lot refaits pour qu'aucun ne contienne d'extrait de scribe. Ni push ni fusion : à
+  valider par l'auteur.
