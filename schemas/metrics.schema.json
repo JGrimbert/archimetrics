@@ -78,7 +78,10 @@
           "files": { "type": "integer" },
           "codeLines": { "type": "integer" },
           "functions": { "type": "integer" },
-          "complexity": { "type": "integer", "description": "Somme des complexités cyclomatiques." }
+          "complexity": { "type": "integer", "description": "Somme des complexités cyclomatiques." },
+          "origine": { "type": "string", "enum": ["observé", "inféré", "déclaré"], "description": "Facultatif. observé : lu dans un fichier du projet (package.json…) ; inféré : déduit d'une convention (dossier de premier niveau) ; déclaré : archimetrics.config.json." },
+          "confiance": { "type": "number", "description": "Facultatif. De 0 à 1 ; 1 pour une déclaration." },
+          "indices": { "type": "array", "items": { "type": "string" }, "description": "Facultatif. D'où vient le groupe." }
         }
       }
     },
@@ -104,7 +107,24 @@
     "sizes": { "type": "object", "description": "Tailles détaillées (non garanti en v1)." },
     "functions": { "type": "object", "description": "Fonctions : moyennes, centiles, histogrammes, plus complexes (non garanti en v1)." },
     "organisation": { "type": "object", "description": "Dossiers et docs de dossier (non garanti en v1)." },
-    "coupling": { "type": "object", "description": "Couplage, cycles, exports morts, classes (non garanti en v1)." },
+    "coupling": {
+      "type": "object",
+      "description": "Couplage, cycles, exports morts, classes (non garanti en v1).",
+      "properties": {
+        "resolution": {
+          "type": ["object", "null"],
+          "description": "Facultatif. Ce qui a servi à résoudre les imports et à reconnaître les entrées (découverte zero config, src/discover/), chaque élément avec origine, confiance, indices ; null sans découverte.",
+          "properties": {
+            "discover": { "type": "boolean" },
+            "aliases": { "type": "array", "items": { "type": "object", "required": ["alias", "path"], "properties": { "alias": { "type": "string" }, "path": { "type": "string" }, "origine": { "type": "string", "enum": ["observé", "inféré", "déclaré"] }, "confiance": { "type": "number" }, "indices": { "type": "array", "items": { "type": "string" } } } } },
+            "packages": { "type": "array", "items": { "type": "object", "required": ["name", "path"], "properties": { "name": { "type": "string" }, "path": { "type": "string" }, "origine": { "type": "string", "enum": ["observé", "inféré", "déclaré"] }, "confiance": { "type": "number" }, "indices": { "type": "array", "items": { "type": "string" } } } } },
+            "pythonRoots": { "type": "array", "items": { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" }, "origine": { "type": "string", "enum": ["observé", "inféré", "déclaré"] }, "confiance": { "type": "number" }, "indices": { "type": "array", "items": { "type": "string" } } } } },
+            "entries": { "type": "array", "items": { "type": "object", "required": ["pattern"], "properties": { "pattern": { "type": "string" }, "files": { "type": "integer" }, "origine": { "type": "string", "enum": ["observé", "inféré", "déclaré"] }, "confiance": { "type": "number" }, "indices": { "type": "array", "items": { "type": "string" } } } } },
+            "generated": { "type": "array", "items": { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" }, "origine": { "type": "string", "enum": ["observé", "inféré", "déclaré"] }, "confiance": { "type": "number" }, "indices": { "type": "array", "items": { "type": "string" } } } } }
+          }
+        }
+      }
+    },
     "duplication": { "type": "object", "description": "Clones au renommage près (non garanti en v1)." },
     "history": { "type": "object", "description": "Points chauds et couplage temporel (non garanti en v1)." },
     "warnings": { "type": "array", "items": { "type": "string" }, "description": "Avertissements d'analyse (non garanti en v1)." },

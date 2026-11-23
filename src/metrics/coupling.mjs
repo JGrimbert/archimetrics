@@ -5,13 +5,15 @@
 // - entre groupes : la matrice des imports ;
 // - cycles d'imports (Tarjan, hors imports de type seul et dynamiques) ;
 // - classes : LCOM4 (Hitz & Montazeri) et injections du constructeur ; modules Nest ;
-// - exports jamais importés et fichiers sans importeur (indicatifs : une entrée, un import dynamique calculé y échappent).
+// - exports jamais importés et fichiers sans importeur (indicatifs : une entrée, un import dynamique calculé y échappent) ;
+// - `resolution` : ce qui a servi à résoudre les imports et à reconnaître les entrées (alias, paquets, racines Python,
+//   points d'entrée, code écarté comme généré), avec `origine` / `confiance` / `indices` (voir `src/discover/`).
 // Les fichiers de test n'entrent pas dans le couplage (ils importent tout), mais leurs imports comptent pour les exports morts.
 
 import { cycles } from '../graph.mjs'
 import { dirOf } from '../files.mjs'
 
-const ENTRY = [/(^|\/)(main|index|app|server|cli)\.[a-z]+$/, /\.config\.[a-z]+$/, /(^|\/)bin\//, /(^|\/)__main__\.py$/, /(^|\/)__init__\.py$/, /\.d\.ts$/]
+const ENTRY = [/(^|\/)(main|index|app|server|cli)\.[a-z]+$/, /\.config\.[a-z]+$/, /(^|\/)bin\//, /(^|\/)__main__\.py$/, /(^|\/)__init__\.py$/, /\.d\.ts$/, /\.worker\.[cm]?[jt]s$/]
 
 export function couplingMetrics(cfg, files, graph, groupOf) {
   const src = new Map(files.filter((f) => !f.test).map((f) => [f.rel, f]))
@@ -83,7 +85,8 @@ export function couplingMetrics(cfg, files, graph, groupOf) {
       if (!u.has(ex)) deadExports.push({ file: f.rel, name: ex })
     }
   }
-  const orphans = [...src.keys()].filter((r) => !importedAtAll.has(r) && !ENTRY.some((re) => re.test(r)) && !(cfg.entries ?? []).some((s) => new RegExp(s).test(r)))
+  const entryRes = (cfg.entries ?? []).map((s) => new RegExp(s))
+  const orphans = [...src.keys()].filter((r) => !importedAtAll.has(r) && !ENTRY.some((re) => re.test(r)) && !entryRes.some((re) => re.test(r)))
 
   // Classes.
   const classes = []
@@ -118,6 +121,19 @@ export function couplingMetrics(cfg, files, graph, groupOf) {
       mostInjected: classes.filter((c) => c.injections.length).sort((a, b) => b.injections.length - a.injections.length).slice(0, 10).map((c) => ({ file: c.file, name: c.name, injections: c.injections.length })),
     },
     external: [...external].map(([name, s]) => ({ name, files: s.size })).sort((a, b) => b.files - a.files),
+    resolution: resolution(cfg, [...src.keys()]),
     violations,
   }
+}
+
+// Ce qui a servi à résoudre (rien sans découverte : configuration construite à la main) ; chaque entrée dit combien de
+// fichiers source elle couvre.
+function resolution(cfg, srcFiles) {
+  const d = cfg.discovery
+  if (!d) return null
+  const entries = d.entries.map((e) => {
+    const re = new RegExp(e.pattern)
+    return { ...e, files: srcFiles.filter((f) => re.test(f)).length }
+  })
+  return { discover: d.enabled, aliases: d.aliases, packages: d.packages, pythonRoots: d.pythonRoots, entries, generated: d.generated }
 }

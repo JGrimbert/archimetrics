@@ -106,7 +106,30 @@ node bin/archimetrics.mjs readme --root ../mon-projet --write README.md   # pose
 }
 ```
 
-Les paquets des workspaces npm sont reconnus seuls ; un seuil à `null` désactive sa règle.
+Un seuil à `null` désactive sa règle. Sans configuration, archimetrics **découvre** l'essentiel seul (zero config, voir
+ci-dessous) : on ne déclare que ce qu'il ne peut pas deviner, ou pour le corriger.
+
+### Découverte zero config
+
+Ce que le projet dit de lui-même est relevé **sans rien exécuter** (`src/discover/`) :
+
+| Quoi | Sources |
+|---|---|
+| Workspaces (groupes, paquets) | `workspaces` du `package.json` (motifs `*`, `**`, `!` compris), `pnpm-workspace.yaml` ; un paquet dont `main` / `exports` vise `src/index.*` (ou `dist/index.js`) se résout depuis `src/` |
+| Alias | `compilerOptions.paths` des `tsconfig*.json` / `jsconfig.json` (avec `baseUrl`, `extends` relatif) ; `resolve.alias` d'un `vite.config.*`, lu comme du texte : seules les formes littérales (`'./src'`, `fileURLToPath(new URL('./src', import.meta.url))`, `path.resolve(__dirname, 'src')`) sont reconnues |
+| Racines Python | dossier d'un `pyproject.toml` / `setup.cfg` / `setup.py` (son `src/` en disposition src), parent d'un paquet de premier niveau (`__init__.py`) |
+| Points d'entrée | `bin`, `main`, `module`, `exports` et fichiers lancés par `scripts` des `package.json` ; `<script src>` des `index.html` ; routes de Nuxt, Next, SvelteKit (si le framework est une dépendance) ; `.storybook/` ; `*.worker.*` |
+| Code généré (écarté des mesures) | dossiers `generated`, `__generated__`, `.nuxt`, `.next`, `.output`, `.svelte-kit` ; `.min.js` ; ligne de commentaire d'en-tête qui commence par `@generated`, `auto-generated`, `Code generated … DO NOT EDIT`, `DO NOT EDIT` |
+| Groupes | la config, sinon les workspaces, puis les dossiers de premier niveau qui portent du code source (un dossier de tests seuls n'en est pas un) |
+
+**La déclaration l'emporte toujours** : `aliases` et `packages` se fondent clé par clé (la clé déclarée gagne) ; une liste
+`pythonRoots` ou `groups` déclarée remplace la liste découverte ; `entries` s'ajoute aux entrées découvertes.
+`"discover": false` coupe la découverte (seuls les workspaces restent détectés).
+
+Chaque élément porte `origine` (**observé** : lu dans un fichier du projet · **inféré** : déduit d'une convention ·
+**déclaré** : lu dans `archimetrics.config.json`), `confiance` (0 à 1) et `indices` (d'où il vient). On les lit dans
+`metrics.json` : sur chaque groupe, et dans `coupling.resolution` (alias, paquets, racines Python, entrées avec le nombre
+de fichiers qu'elles couvrent, code écarté comme généré).
 
 - `archimetrics.baseline.json` — les violations tolérées. Le garde-fou échoue sur une violation **nouvelle** ; en mode
   strict (`strictBaseline`, par défaut), aussi sur une violation tolérée qui a disparu : elle doit sortir de la liste, qui
@@ -119,7 +142,7 @@ Schema 2020-12) est publié dans [`schemas/metrics.schema.json`](schemas/metrics
 
 - **Garantis en v1** : `schemaVersion`, `tool`, `name`, `date`, `commit` (chaîne ou `null`), `limits`, `summary` (tous
   ses champs), `violations` (règle → liste de violations, dont seul `key` est garanti), `groups` (`name`, `path`,
-  `files`, `codeLines`, `functions`, `complexity`), `check` (objet ou `null`).
+  `files`, `codeLines`, `functions`, `complexity` ; `origine`, `confiance`, `indices` facultatifs), `check` (objet ou `null`).
 - **Décrits, non garantis en v1** : `files`, `sizes`, `functions`, `organisation`, `coupling`, `duplication`, `history`,
   `warnings`, `durationMs`, `baselinePath`, et les champs `value` / `limit` / `detail` d'une violation.
 
@@ -145,9 +168,10 @@ de sortie est 0 : le diff informe, `check` juge.
   temporaire du système, analyse sans Git (ni points chauds), dossier supprimé à la fin. Ni `checkout`, ni `stash`, ni
   `worktree` : archimetrics ne lance que des commandes Git de lecture (`src/git.mjs` refuse les autres). Sans `--head`,
   l'autre côté est l'arbre de travail (fichiers suivis ou non ignorés). Chaque côté est mesuré avec **sa** configuration
-  (`archimetrics.config.json` de la révision, ou les valeurs par défaut si elle n'en a pas), sauf avec `--config <f>`,
+  (`archimetrics.config.json` de la révision, ou les valeurs par défaut et la découverte si elle n'en a pas), sauf avec `--config <f>`,
   qui impose la même aux deux côtés (utile pour une révision antérieure à la config) ; la mesure est toujours faite par
-  la version courante d'archimetrics. Les deux relevés comparés sont écrits à côté (`avant.json`, `apres.json`). Un fichier marqué `export-ignore` dans `.gitattributes` n'est pas extrait.
+  la version courante d'archimetrics. Quand les deux configurations déclarées diffèrent (ou qu'un côté n'en a pas), le
+  diff **avertit** (dans la console, `metrics-diff.json` et `metrics-diff.md`) et nomme les clés en cause (D-020). Les deux relevés comparés sont écrits à côté (`avant.json`, `apres.json`). Un fichier marqué `export-ignore` dans `.gitattributes` n'est pas extrait.
 - Un relevé **sans `schemaVersion`** (antérieur à v1, par exemple sur une branche `metriques` déjà publiée) est lu comme
   « pré-v1 », avec un avertissement, s'il a au moins `summary` et `violations` ; sinon, l'erreur le dit.
 
@@ -156,6 +180,9 @@ de sortie est 0 : le diff informe, `check` juge.
 - Complexité cognitive approchée : ni sauts étiquetés ni récursion ; une fonction imbriquée est mesurée à part.
 - Une fonction est repérée par son nom : la renommer la fait sortir puis entrer dans la baseline.
 - Exports morts et fichiers sans importeur sont indicatifs : un import calculé, un point d'entrée inconnu y échappent.
+- Découverte : un `vite.config` n'est pas exécuté (un alias calculé n'est pas vu) ; les `paths` de plusieurs `tsconfig` sont
+  fondus en un seul jeu d'alias pour tout le dépôt (un même alias vers deux dossiers : le plus sûr gagne, l'autre est noté) ;
+  un `extends` vers un paquet npm n'est pas suivi ; les fichiers `.svelte` ne sont pas analysés.
 - Les images du README sont lues sur `raw.githubusercontent.com` : un dépôt privé ne les montre qu'aux comptes qui y ont accès.
 
 ## Développement

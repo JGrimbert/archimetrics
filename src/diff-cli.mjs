@@ -1,15 +1,21 @@
 // LA COMMANDE `archimetrics diff` :
 //   archimetrics diff <avant.json> <après.json> [--out <dossier>]
 //   archimetrics diff --base <ref> [--head <ref>] [--root .] [--config f] [--out <dossier>]
-// (`--config` : une même configuration pour les deux côtés ; sans elle, chaque côté prend la sienne.)
+// (`--config` : une même configuration pour les deux côtés ; sans elle, chaque côté prend la sienne, et le diff avertit
+// quand elles diffèrent : D-020.)
 // Écrit `metrics-diff.json` et `metrics-diff.md` (par défaut dans `<root>/.archimetrics/diff`) ; avec `--base`, aussi les
 // deux relevés comparés (`avant.json`, `apres.json`). Affiche le Markdown. Code de sortie 0 : le diff informe, `check` juge
 // (1 seulement sur une erreur : fichier illisible, référence introuvable…).
 
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { diffMarkdown, diffMetrics, readableMetrics, readMetricsFile } from './diff.mjs'
-import { measureBase } from './git-base.mjs'
+import { configWarning, diffMarkdown, diffMetrics, readableMetrics, readMetricsFile } from './diff.mjs'
+import { measureBase, resolveRef } from './git-base.mjs'
+import { tryGit } from './git.mjs'
+import { untar } from './tar.mjs'
+
+const CONFIG = 'archimetrics.config.json'
 
 const OPTIONS_WITH_VALUE = new Set(['--out', '--root', '--base', '--head', '--config'])
 
@@ -24,12 +30,36 @@ function sides(argv, opt) {
     const root = resolve(opt('root', '.'))
     const config = opt('config') ? resolve(opt('config')) : null
     const { before, after } = measureBase(root, base, opt('head'), config)
-    return { root, before: { ...readableMetrics(before.doc, before.label), label: before.label }, after: { ...readableMetrics(after.doc, after.label), label: after.label } }
+    const warning = config ? null : configWarning({ label: before.label, config: configAt(root, base) }, { label: after.label, config: configAt(root, opt('head')) })
+    return { root, warnings: warning ? [warning] : [], before: { ...readableMetrics(before.doc, before.label), label: before.label }, after: { ...readableMetrics(after.doc, after.label), label: after.label } }
   }
   const files = positionals(argv)
   if (files.length !== 2) throw new Error('Usage : archimetrics diff <avant.json> <après.json> [--out d] · ou --base <ref> [--head <ref>] [--root .]')
   const read = (p) => ({ ...readMetricsFile(resolve(p)), label: p })
-  return { root: resolve(opt('root', '.')), before: read(files[0]), after: read(files[1]) }
+  return { root: resolve(opt('root', '.')), warnings: [], before: read(files[0]), after: read(files[1]) }
+}
+
+const parseConfig = (text) => {
+  try { return JSON.parse(text) } catch { return { '(illisible)': text } }
+}
+
+/**
+ * La configuration déclarée (`archimetrics.config.json`, objet) d'une révision de `root`, ou de son arbre de travail si
+ * `ref` est absent ; null s'il n'y en a pas. Lue par `git archive <sha> -- archimetrics.config.json` (lecture seule),
+ * extraite dans un dossier temporaire aussitôt supprimé.
+ */
+export function configAt(root, ref) {
+  if (!ref) return existsSync(join(root, CONFIG)) ? parseConfig(readFileSync(join(root, CONFIG), 'utf8')) : null
+  const { sha } = resolveRef(root, ref)
+  const tar = tryGit(['archive', '--format=tar', sha, '--', CONFIG], { cwd: root, encoding: 'buffer' })
+  if (!tar) return null
+  const tmp = mkdtempSync(join(tmpdir(), 'archimetrics-'))
+  try {
+    untar(tar, tmp)
+    return existsSync(join(tmp, CONFIG)) ? parseConfig(readFileSync(join(tmp, CONFIG), 'utf8')) : null
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
 }
 
 /**
@@ -46,6 +76,7 @@ export function runDiff(argv, opt) {
     return 1
   }
   const d = diffMetrics(s.before, s.after)
+  d.warnings.push(...s.warnings)
   for (const w of d.warnings) console.warn('⚠ ' + w)
   const out = resolve(opt('out') ?? join(s.root, '.archimetrics', 'diff'))
   mkdirSync(out, { recursive: true })

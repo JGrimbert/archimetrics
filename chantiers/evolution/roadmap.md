@@ -42,6 +42,10 @@ rien n'est fusionné.
   `src/metrics/coupling.mjs` (`ENTRY`), `schemas/metrics.schema.json`.
 - **Risques** : lire `vite.config` sans l'exécuter ne couvre que les formes littérales → `confiance` basse et indice
   explicite ; la déclaration (`archimetrics.config.json`) doit toujours l'emporter (`origine: déclaré`).
+- **Livré** (écart au plan) : `src/discover/scan.mjs` (repérage borné des fichiers-indices, sans Git, pour servir aussi
+  aux révisions extraites) ; un paquet se résout depuis le dossier de son point d'entrée (`src/`), sans toucher
+  `src/graph.mjs` ; `*.worker.*` ajouté à `ENTRY` ; le relevé de découverte est dans `coupling.resolution` (DS-4) ;
+  `test/diff.test.mjs` : test des dossiers temporaires rendu robuste au parallélisme.
 
 ## AM-3 · Adaptateurs LLM et banc
 

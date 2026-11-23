@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { diffMarkdown, diffMetrics, readableMetrics } from '../src/diff.mjs'
+import { configWarning, diffMarkdown, diffMetrics, readableMetrics } from '../src/diff.mjs'
+import { configAt, runDiff } from '../src/diff-cli.mjs'
 import { git, onGit, READ_ONLY } from '../src/git.mjs'
 import { measureBase } from '../src/git-base.mjs'
 import { loadSchema, METRICS_SCHEMA, validate } from '../src/schema.mjs'
@@ -141,7 +142,8 @@ test('--base : deux révisions d’un dépôt factice, commandes git de lecture 
     for (const c of calls) assert.ok(READ_ONLY.includes(c) && ['rev-parse', 'archive', 'log', 'status'].includes(c), `commande git inattendue : ${c}`)
     assert.ok(calls.includes('archive'))
     assert.equal(run(root, 'status', '--porcelain', '--branch'), statusBefore)
-    assert.deepEqual(leftovers(), tmpBefore, 'dossier temporaire supprimé')
+    // Seuls les dossiers nouveaux comptent : un autre fichier de test (analyse Python) peut en créer et en retirer en parallèle.
+    assert.deepEqual(leftovers().filter((n) => !tmpBefore.includes(n)), [], 'dossier temporaire supprimé')
     const schema = loadSchema('metrics.schema.json')
     assert.deepEqual(validate(schema, JSON.parse(JSON.stringify(pair.before.doc))), [])
     assert.equal(pair.before.doc.commit, one.slice(0, pair.before.doc.commit.length))
@@ -172,6 +174,63 @@ test('--base sans --head : la révision contre l’arbre de travail ; référenc
     }
     assert.throws(() => measureBase(root, 'inexistante'), /Référence introuvable/)
     assert.throws(() => measureBase(root, '--output=x'), /Référence invalide/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('--base, D-020 : chaque côté lit sa config (git archive en lecture seule) ; avertissement quand elles diffèrent', () => {
+  const { root, one } = fakeRepo()
+  try {
+    writeFileSync(join(root, 'archimetrics.config.json'), '{ "limits": { "functionLines": 60 } }\n')
+    run(root, 'add', '.')
+    run(root, 'commit', '-q', '-m', 'config')
+    const withCfg = run(root, 'rev-parse', 'HEAD').trim()
+    const calls = []
+    const stop = onGit((args) => calls.push(args[0]))
+    try {
+      assert.equal(configAt(root, one), null, 'pas de config dans la première révision')
+      assert.deepEqual(configAt(root, withCfg), { limits: { functionLines: 60 } })
+    } finally {
+      stop()
+    }
+    for (const c of calls) assert.ok(['rev-parse', 'archive'].includes(c), `commande git inattendue : ${c}`)
+    assert.equal(configWarning({ label: 'HEAD', config: configAt(root, 'HEAD') }, { label: 'arbre', config: configAt(root, null) }), null, 'même config : pas d’avertissement')
+    writeFileSync(join(root, 'archimetrics.config.json'), '{ "limits": { "functionLines": 80 } }\n')
+    const statusBefore = run(root, 'status', '--porcelain', '--branch')
+    const out = mkdtempSync(join(tmpdir(), 'archimetrics-test-out-'))
+    const warned = []
+    const [warn, log] = [console.warn, console.log]
+    console.warn = (m) => warned.push(m)
+    console.log = () => {}
+    let code
+    try {
+      const opts = { base: 'HEAD', root, out }
+      code = runDiff([], (name, fallback = null) => opts[name] ?? fallback)
+    } finally {
+      [console.warn, console.log] = [warn, log]
+    }
+    assert.equal(code, 0)
+    assert.ok(warned.some((w) => /clés différentes : limits.*D-020/.test(w)), warned.join('\n'))
+    const d = JSON.parse(readFileSync(join(out, 'metrics-diff.json'), 'utf8'))
+    assert.ok(d.warnings.some((w) => /D-020/.test(w)))
+    assert.deepEqual(validate(loadSchema('metrics-diff.schema.json'), d), [])
+    assert.equal(run(root, 'status', '--porcelain', '--branch'), statusBefore)
+    rmSync(out, { recursive: true, force: true })
+    const cfgFile = join(root, '..', `archimetrics-test-cfg20-${process.pid}.json`)
+    writeFileSync(cfgFile, '{}')
+    const quiet = []
+    console.warn = (m) => quiet.push(m)
+    console.log = () => {}
+    try {
+      const opts = { base: 'HEAD', root, out, config: cfgFile }
+      runDiff([], (name, fallback = null) => opts[name] ?? fallback)
+    } finally {
+      [console.warn, console.log] = [warn, log]
+      rmSync(cfgFile, { force: true })
+      rmSync(out, { recursive: true, force: true })
+    }
+    assert.ok(!quiet.some((w) => /D-020/.test(w)), '--config : une seule config, pas d’avertissement')
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

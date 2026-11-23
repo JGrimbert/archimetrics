@@ -3,6 +3,9 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { applyDiscovery } from './discover/index.mjs'
+import { scanHints } from './discover/scan.mjs'
+import { discoverWorkspaces } from './discover/workspaces.mjs'
 
 export const DEFAULTS = {
   // Nom affiché dans les rapports (par défaut : le `name` du package.json racine, sinon le dossier).
@@ -14,10 +17,15 @@ export const DEFAULTS = {
   // Ce qui est un fichier de test (expressions régulières, sur le chemin relatif en barres obliques).
   tests: ['\\.(test|spec|stories)\\.[a-z]+$', '(^|/)(tests?|e2e|__tests__|__mocks__)/', '(^|/)conftest\\.py$', '(^|/)test_[^/]*\\.py$'],
   extensions: ['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx', '.vue', '.py'],
-  // Alias d'imports : { "@": "frontend/src" } (`@/x` → `frontend/src/x`). Les paquets des workspaces npm sont détectés seuls.
+  // Découverte zero config (`src/discover/`) : alias, racines Python, points d'entrée, code généré, workspaces à motif.
+  // La déclaration l'emporte toujours ; `false` coupe la découverte (seuls les workspaces restent détectés).
+  discover: true,
+  // Alias d'imports : { "@": "frontend/src" } (`@/x` → `frontend/src/x`). Découverts seuls depuis `tsconfig`/`jsconfig` et
+  // `vite.config` ; les paquets des workspaces npm aussi.
   aliases: {},
   packages: {},
   // Dossiers d'où partent les imports absolus de Python (`from app.services import x` → `<racine>/app/services/x.py`).
+  // Découverts seuls (`pyproject.toml`, paquets à `__init__.py`) ; une liste déclarée remplace la liste découverte.
   pythonRoots: [],
   // Les seuils. `null` désactive une règle.
   limits: {
@@ -37,7 +45,8 @@ export const DEFAULTS = {
   docName: 'CLAUDE.md',
   // Chemins cités volontairement hors du dépôt (expressions régulières) : jamais signalés comme morts.
   docLinksIgnore: [],
-  // Points d'entrée (expressions régulières) : un fichier sans importeur qui y répond n'est pas orphelin.
+  // Points d'entrée (expressions régulières) : un fichier sans importeur qui y répond n'est pas orphelin. S'ajoutent à ceux
+  // découverts (`bin`, `main`, `exports`, `scripts` des package.json, `<script src>` des index.html, routes de frameworks).
   entries: [],
   duplication: { minTokens: 70, includeTests: false, maxPercent: null },
   // Découpage pour le couplage et les diagrammes : [{ name, path }]. Vide : les workspaces npm, puis les dossiers de premier niveau.
@@ -64,11 +73,10 @@ export function loadConfig(root, file = null) {
   cfg.root = resolve(root)
   cfg.configPath = existsSync(path) ? path : null
   if (!cfg.name) cfg.name = readName(cfg.root)
-  cfg.packages = { ...detectWorkspaces(cfg.root), ...cfg.packages }
   cfg.testRes = cfg.tests.map((s) => new RegExp(s))
   cfg.excludeNames = new Set(cfg.exclude.filter((s) => !s.startsWith('re:')))
   cfg.excludeRes = cfg.exclude.filter((s) => s.startsWith('re:')).map((s) => new RegExp(s.slice(3)))
-  return cfg
+  return applyDiscovery(cfg, user)
 }
 
 function readJson(p) {
@@ -79,19 +87,8 @@ function readName(root) {
   return readJson(join(root, 'package.json'))?.name ?? root.split(/[\\/]/).pop()
 }
 
-// Les workspaces npm (`"workspaces": ["frontend", "packages/*"]`) : nom du paquet → dossier.
+// Les workspaces npm ou pnpm (`"workspaces": ["frontend", "packages/*"]`, motifs compris) : nom du paquet → dossier.
 export function detectWorkspaces(root) {
-  const pkg = readJson(join(root, 'package.json'))
-  const ws = Array.isArray(pkg?.workspaces) ? pkg.workspaces : pkg?.workspaces?.packages ?? []
-  const out = {}
-  for (const w of ws) {
-    if (w.includes('*')) continue // un motif : non suivi (déclarer les paquets dans `packages`)
-    const name = readJson(join(root, w, 'package.json'))?.name
-    if (name) out[name] = w.replace(/\\/g, '/').replace(/\/$/, '')
-  }
-  return out
-}
-
-export function workspaceDirs(root) {
-  return Object.values(detectWorkspaces(root))
+  const scan = scanHints(resolve(root), (name) => DEFAULTS.exclude.includes(name))
+  return Object.fromEntries(discoverWorkspaces(resolve(root), scan.files).map((w) => [w.name, w.path]))
 }

@@ -1,6 +1,6 @@
 # Chantier « évolution » d'ArchiMetrics — état
 
-> Vérifié le **2026-11-23** : **`68392ca`** (`main`, étiquette `v1`), AM-0 et AM-1 fusionnés (audit fait sur `bcb1e3f`).
+> Vérifié le **2026-11-23** : AM-2 sur `lot/AM-2` (non fusionné), parti de `68392ca` (`main`, `v1`, AM-0 et AM-1 fusionnés).
 > Cible du chantier : Phase 2 de `C:\jgr\archi\ARCHI_ROADMAP.md` (lots AM-0 à AM-6). Plan interne : [roadmap.md](roadmap.md).
 > Statuts : [CONSTAT] (fichier cité), [INTERPRÉTATION], [HYPOTHÈSE], [À VÉRIFIER].
 
@@ -15,7 +15,12 @@
   « Comparaison vérifiée sur scribe » ci-dessous. `npm test` : **26 tests verts** (15 au départ).
 - **DS-3 tranchée par D-020** (validée, option (c)) : chaque côté de `diff --base` garde sa configuration, avec un
   avertissement si elles diffèrent ; à livrer dans AM-2.
-- **Lot en cours** : AM-2 (découverte zero config), avec l'avertissement de D-020.
+- **D-020 livrée dans AM-2** : `diff --base` avertit quand les deux configurations déclarées diffèrent (voir AM-2).
+- **AM-2 fait sur `lot/AM-2`** (non fusionné, non poussé) : découverte zero config (`src/discover/`), champs
+  `origine` / `confiance` / `indices`, avertissement de D-020. Détail et preuves : « Découverte vérifiée (AM-2) »
+  ci-dessous. `npm test` : **35 tests verts** ; `check --root . --no-git` : 0 violation nouvelle, 37 tolérées.
+- **Prochain lot** : AM-3 (adaptateurs LLM), au choix de l'auteur ; fiche `lots/AM-2.md` d'`archi` à passer à « fait »
+  (hors de ce dépôt, non touchée).
 - `chantiers/ecosysteme/` (dossier vide) supprimé par `rmdir` [CONSTAT].
 - **Baseline** : `node bin/archimetrics.mjs check --root . --no-git` relève **37 violations**, comme attendu (aucun
   écart avec 37) [CONSTAT] : `functionLines` 8, `cyclomatic` 12, `cognitive` 16, `nesting` 1. Elles sont toutes
@@ -86,9 +91,63 @@ même avant et après la session [CONSTAT] :
   (`backend/src/edition/edit-nodes.ts#moveNodeOps`, `cyclomatic` et `cognitive`), dans un fichier non commité de son
   travail en cours.
 
+## Découverte vérifiée (AM-2)
+
+Toutes les analyses ont porté sur des **copies** extraites par `git archive HEAD` dans le scratchpad de la session, avec
+une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr-ui est le même avant et après [CONSTAT].
+
+- **Scribe sans `archimetrics.config.json`** [CONSTAT] (HEAD `954b0bb2` ; la config, désormais suivie par Git, est
+  retirée de la copie ; découverte + liste : 0,8 s ; `report --no-git` : 8,6 s) :
+
+  | | Config de scribe | Découvert sans config |
+  |---|---|---|
+  | Groupes | frontend, backend, shared (`packages/shared`), nlp-service, tools | les **mêmes 5**, mêmes chemins : 3 workspaces (observé, 1), `nlp-service` et `tools` (inféré, 0,6) |
+  | Alias | `@` → `frontend/src` | `@` → `frontend/src` (observé, 0,7 : `frontend/vite.config.js`, `fileURLToPath(new URL('./src', …))`) |
+  | Racines Python | `nlp-service` | `nlp-service` (inféré, 0,7 : `nlp-service/app/__init__.py`) |
+  | Entrées | `^tools/`, `^frontend/\.storybook/`, `\.worker\.ts$` | `.storybook/` (inféré), `frontend/src/main.js` (`index.html`), `frontend/src/script/sand.js` (`scripts.sand`) ; `*.worker.*` est devenu une entrée par défaut |
+
+  Relevés complets : **arêtes 4 545 = 4 545, imports non résolus 6 = 6, exports morts 547 = 547**, mêmes 5 groupes et
+  mêmes effectifs ; violations 902 contre 903. Les seuls écarts viennent de choix propres à scribe, pas de la découverte :
+  orphelins 118 contre 2 (`^tools/` déclaré : des scripts lancés à la main), `docRequired` 0 contre 11 et `docLinks` 48
+  contre 38 (`docRequiredFrom`, `docLinksIgnore` déclarés). Critère « groupes et alias ≥ config » : **atteint**.
+- **Diff entre deux commits de scribe sans config** [CONSTAT] : `diff --base ad137656 --head 47fe8110` (21 s) donne
+  `deadExports` **538 → 539**, ce qu'AM-1 n'obtenait qu'avec `--config` (608 → 609 sans) ; violations 893 → 897, 6
+  ajoutées, 2 résorbées, comme en AM-1 ; aucune des deux révisions n'a de config : **pas d'avertissement**.
+- **D-020 sur scribe** [CONSTAT] : `diff --base ad137656` contre l'arbre de travail (qui a sa config ; 20 s) affiche
+  « les deux côtés n'ont pas la même configuration (archimetrics.config.json absente côté ad137656) ; … passer --config
+  <fichier> pour imposer la même (D-020) », dans la console, `metrics-diff.json` et `metrics-diff.md`. Avec `--config`,
+  rien (test `diff.test.mjs`). La config d'une révision est lue par `git archive <sha> -- archimetrics.config.json`.
+- **Deux dépôts inconnus de l'outil** (aucune config) [CONSTAT] :
+  - `C:\jgr\CC` (`1f08fb6`, monorepo `apps/*` + `packages/*`, TS + Vue, 368 fichiers de code, 1,6 s) : 0 erreur, 0
+    avertissement, schéma valide ; 26 workspaces observés + `scripts` inféré ; 6 alias de `tsconfig` ; 39 entrées. Les
+    imports non résolus sont tombés de **50 à 2** quand un paquet se résout depuis le dossier de son point d'entrée
+    (`main: src/index.ts` → `packages/x/src`) ; les 2 restants visent `../generated/prisma`, écarté comme généré.
+  - `C:\jgr-ui` (Svelte 5, 10 fichiers analysables, 0,1 s) : 0 erreur, schéma valide ; alias `$lib` → `src/lib` ;
+    entrées `src/index` (`exports`, `dist/index.js` ramené à la source) et `src/routes/` (SvelteKit) ; 45 fichiers de
+    `.svelte-kit/` (suivis par Git) écartés comme générés. Les `.svelte` ne sont pas analysés (limite notée au README).
+- **ArchiMetrics lui-même** [CONSTAT] : groupes `bin`, `src` (le groupe vide `test` n'est plus émis) ; entrée
+  `bin/archimetrics.mjs` (`package.json` `bin` et `scripts.self`).
+- [INTERPRÉTATION] `origine` : **observé** = lu dans un fichier du projet (manifeste, configuration d'outil, en-tête) ;
+  **inféré** = déduit d'une convention (dossier de premier niveau, `__init__.py`, routes de framework) ; **déclaré** =
+  `archimetrics.config.json`. Ils sont émis sur `groups` et dans `coupling.resolution` ; pas sur `coupling.modules`,
+  qui sont des dossiers, tous observés par construction.
+- [INTERPRÉTATION] Le relevé de découverte est rangé dans `coupling.resolution` (ce qui a servi à résoudre les imports et
+  à reconnaître les entrées), parce que `src/metrics/index.mjs`, qui compose `metrics.json`, est hors du périmètre du
+  lot. Voir DS-4.
+- [CONSTAT] Test existant fragile, corrigé : `--base … dossier temporaire intacts` comparait tout le contenu de
+  `os.tmpdir()` ; l'analyseur Python (`src/analyze/python.mjs`) y crée aussi des dossiers `archimetrics-*` et le nouveau
+  `test/discover.test.mjs` (qui analyse du Python) tourne en parallèle. Le test ne regarde plus que les dossiers nouveaux.
+
 ## Décisions à soumettre
 
-_Aucune en attente._
+### DS-4 — Où publier le relevé de découverte dans `metrics.json` (proposée, non bloquante)
+- **Contexte** : AM-2 range alias, paquets, racines Python, entrées et code généré dans `coupling.resolution` (non
+  garanti), faute de pouvoir toucher `src/metrics/index.mjs` dans ce lot.
+- **Options** : (a) garder `coupling.resolution` ; (b) un champ de premier niveau `discovery` (facultatif, sans `/2`),
+  dans un lot dont le périmètre inclut `src/metrics/index.mjs`, et une page « Découverte » dans le rapport Markdown
+  (`src/report/markdown.mjs`, hors périmètre aussi).
+- **Recommandation** : **(b)**, avec AM-5 (restitution) ou un petit lot dédié : la découverte concerne tout le relevé,
+  pas seulement le couplage, et le lecteur du rapport doit voir ce qui a été deviné.
 
 ## Décisions tranchées
 
@@ -131,3 +190,8 @@ _Aucune en attente._
   `diff --base` (DS-3). `npm test` 26/26 ; `check --root . --no-git` : 0 violation nouvelle, 37 tolérées.
 - **2026-11-23** — AM-0 et AM-1 fusionnés dans `main` (`68392ca`, étiquette `v1`). DS-3 tranchée par D-020 (option (c),
   avertissement à livrer dans AM-2). Prochain lot : AM-2.
+- **2026-11-23** — AM-2 sur `lot/AM-2` (depuis `chantier/etat-apres-AM-1`) : `src/discover/` (`scan`, `workspaces`,
+  `aliases`, `python`, `entries`, `generated`, `index`), branché dans `loadConfig` ; `groups.mjs` (origine, plus de groupe
+  de tests seuls) ; `coupling.mjs` (`*.worker.*`, `resolution`) ; D-020 dans `diff-cli.mjs` / `diff.mjs` ; schéma
+  (champs facultatifs) ; README. Essais sur scribe, CC, jgr-ui (copies hors dépôt). `npm test` 35/35 ; `check` : 0
+  violation nouvelle, 37 tolérées. DS-4 proposée.

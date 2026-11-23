@@ -144,6 +144,35 @@ function filesMd(files) {
   return ['## Fichiers', '', `${files.added.length} apparu(s), ${files.removed.length} disparu(s).`, ...listed(files.added, '+'), ...listed(files.removed, '−')]
 }
 
+// ——— Configurations des deux côtés (D-020) ———
+
+const canonical = (v) => JSON.stringify(v, (_, x) => (isObject(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x))
+
+/**
+ * Les clés de premier niveau qui diffèrent entre deux configurations déclarées (`null` : pas de fichier), triées.
+ * @param {object|null} a
+ * @param {object|null} b
+ */
+export function configDifference(a, b) {
+  const x = a ?? {}
+  const y = b ?? {}
+  return [...new Set([...Object.keys(x), ...Object.keys(y)])].filter((k) => canonical(x[k]) !== canonical(y[k])).sort()
+}
+
+/**
+ * L'avertissement de D-020 : chaque côté d'un `diff --base` est mesuré avec SA configuration ; quand elles diffèrent, la
+ * comparaison mélange deux lunettes, on le dit. Rend null si elles sont identiques (ou toutes deux absentes).
+ * @param {{ label: string, config: object|null }} before
+ * @param {{ label: string, config: object|null }} after
+ */
+export function configWarning(before, after) {
+  const keys = configDifference(before.config, after.config)
+  if (!keys.length) return null
+  const absent = [before, after].filter((s) => s.config === null).map((s) => s.label)
+  const what = absent.length ? `absente côté ${absent.join(' et ')}` : `clés différentes : ${keys.join(', ')}`
+  return `les deux côtés n'ont pas la même configuration (archimetrics.config.json ${what}) ; chacun est mesuré avec la sienne — passer --config <fichier> pour imposer la même (D-020)`
+}
+
 /** Le résumé Markdown du diff (`metrics-diff.md`). */
 export function diffMarkdown(d) {
   const who = (s) => `${s.label}${s.commit ? ` (\`${s.commit}\`)` : ''}`
