@@ -28,8 +28,13 @@
   poussé), critère du banc non tenu au sens de D-035 (validée, (a) + (c)) : `archimetrics review` (`src/review/`,
   `schemas/review.schema.json`, mode `--mode revue` du banc). Détail et mesures : « Revue (AM-4) » ci-dessous.
   `npm test` : **69 tests verts** ; `check --root .` : 0 violation nouvelle, 37 tolérées. Critère du banc : D-035 (validée)
-  dans `C:\jgrrchi\ARCHI_DECISIONS.md` ; la revue LLM n'est qu'un avis non bloquant jusqu'à AM-4b.
-- **Prochain lot** : AM-4b (rappel de la revue, D-035 (c)) ; AM-5 (restitution, avec D-021) au choix de l'auteur.
+  dans `C:\jgr\archi\ARCHI_DECISIONS.md` ; la revue LLM n'est qu'un avis non bloquant jusqu'à AM-4b.
+- **AM-4b fait sur `lot/AM-4b`** le 2026-11-24 (à valider par l'auteur ; ni fusionné, ni poussé) : `archimetrics review
+  --contexte fichier`. Au cumul de 3 passages à chaud (`71fbe0e3`), **D-035 (a) tenu** : défauts 6/15, sains 15/15, faux
+  0/6, ≈ 30 min le banc. Détail : « Rappel de la revue (AM-4b) » ci-dessous. `npm test` : **73 tests verts** ; `check
+  --root .` : 0 violation nouvelle, 37 tolérées. Contexte par défaut de la revue : **D-036** (proposée) dans
+  `C:\jgr\archi\ARCHI_DECISIONS.md` ; la revue LLM reste un avis non bloquant.
+- **Prochain lot** : AM-5 (restitution, avec D-021) au choix de l'auteur.
 - **DS-4 acceptée** (option (b), 2026-11-23) : relevé de découverte en champ `discovery` de premier niveau et page
   « Découverte » du rapport, avec AM-5 ; reportée : D-021.
 - `chantiers/ecosysteme/` (dossier vide) supprimé par `rmdir` [CONSTAT].
@@ -215,9 +220,39 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
 - Limites [CONSTAT] : les fichiers non-code (Markdown) passent aussi par le LLM ; au-delà de `--max-segments` (40), les
   segments ne sont pas revus (avertissement) ; la revue n'est pas encore branchée dans `archi verify` (après validation).
 
+## Rappel de la revue (AM-4b)
+
+- **Option** [CONSTAT `src/review/passes.mjs`, `collect.mjs`, `cli.mjs`] : `archimetrics review --contexte fichier
+  [--num-ctx <n>]`. L'examen et les deux contre-vérifications voient aussi le fichier après le changement, lu par `git
+  show` à la révision d'arrivée, lignes numérotées, entier jusqu'à 12 000 caractères, sinon une fenêtre autour du
+  segment ; consigne `revue-am4b-1+fichier-1`. `--num-ctx` passe `options.num_ctx` à Ollama (8192 sur le banc).
+  `--contexte diff` reste le défaut (D-036, proposée). Testé sans réseau (`fetch` global piégé).
+- **Filtre de preuve** [CONSTAT `locateProof`, testé] : la preuve citée se découpe aussi sur les « \n » littéraux. Qwen
+  cite parfois un bloc ainsi, et le filtre écartait à tort le bon constat de s1. Consigne `revue-am4b-1`.
+- **Banc** [CONSTAT `bench/extract.mjs`, `lib.mjs`] : fichiers après le changement lus par `git show` du blob d'arrivée
+  (ligne `index` du diff), sinon reconstitués en appliquant le diff au fichier du commit du cas ; hachés dans
+  l'empreinte. Lecture seule (testé : dépôt intact).
+- **Mesures** [CONSTAT `bench/resultats.md`, Qwen 4B, graine 42, 3 passages à chaud chacun, cumul] :
+
+  | Banc | Contexte, consigne | Défauts | Sains « rien » | Faux / émis | Latence médiane | Banc | D-035 (a) |
+  |---|---|---|---|---|---|---|---|
+  | `03ad2d95` (AM-4) | diff, `revue-am4-3` | 1/15 | 15/15 | 1/2 | 55–66 s | ≈ 10 min | non |
+  | `864bf925` | fichier, `revue-am4-3+fichier-1` | 3/15 | 15/15 | 0/3 | 127–134 s | ≈ 27 min | non (rappel) |
+  | `1880f419` | diff, `revue-am4b-1` | 3/15 | 12/15 | 2/5 | 53–60 s | ≈ 11 min | non |
+  | `71fbe0e3` | fichier, `revue-am4b-1+fichier-1` | **6/15** | **15/15** | **0/6** | 141–142 s | ≈ 30 min | **oui** |
+
+- [INTERPRÉTATION] Le rappel vient de deux causes : le filtre de preuve, qui écartait un bon constat (s1, retrouvé dans
+  les deux contextes), et le fichier entier, sans lequel a2 n'est pas trouvé. Le fichier tient aussi la précision : le
+  faux de s6 n'apparaît qu'en contexte `diff`. Le critère est tenu **au plancher exact** sur un banc de 5 défauts : un
+  défaut de moins le ferait tomber. s2, s3 et a1 restent manqués (s3 et a1 réfutés par la contre-vérification, s2 sans
+  constat).
+- **Pistes non faites** : modèle plus grand, reportée par l'auteur (4 Go de VRAM, aucun Qwen 8B/14B installé) ; passes
+  réservées aux fichiers de code, sans objet sur ce banc (les 10 cas ne touchent que du code).
+
 ## Décisions à soumettre
 
-_Aucune en attente._
+- **D-036** (proposée, `C:\jgr\archi\ARCHI_DECISIONS.md`) : contexte par défaut d'`archimetrics review`
+  après AM-4b (`fichier` ou `diff`), et place de la revue LLM dans V-1.
 
 ## Décisions tranchées
 
@@ -290,3 +325,7 @@ _Aucune en attente._
   valider par l'auteur.
 - **2026-11-23** — AM-3 validé par l'auteur ; `lot/AM-3` fusionné dans `main` par avance rapide (56 tests verts, 0 violation
   nouvelle, `archi verify` ok sur la pointe du lot) ; rien de poussé ; `v1` inchangée.
+- **2026-11-24** — AM-4b sur `lot/AM-4b` (depuis `main`, `117d7b7`) : `--contexte fichier` et `--num-ctx` (revue et
+  banc), filtre de preuve sur les « \n » littéraux (consigne `revue-am4b-1`), fichiers après le changement dans le banc
+  (`780dd51`). Mesures : `71fbe0e3` tient D-035 (a) (6/15, 15/15, 0/6) ; `1880f419` (diff) non. `npm test` 73/73 ;
+  `check` : 0 violation nouvelle, 37 tolérées. D-036 proposée. Ni push ni fusion : à valider par l'auteur.
