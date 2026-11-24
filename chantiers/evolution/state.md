@@ -29,7 +29,8 @@
   `schemas/review.schema.json`, mode `--mode revue` du banc). Détail et mesures : « Revue (AM-4) » ci-dessous.
   `npm test` : **69 tests verts** ; `check --root .` : 0 violation nouvelle, 37 tolérées. Critère du banc : D-035 (validée)
   dans `C:\jgr\archi\ARCHI_DECISIONS.md` ; la revue LLM n'est qu'un avis non bloquant jusqu'à AM-4b.
-- **AM-4b fait sur `lot/AM-4b`** le 2026-11-24 (à valider par l'auteur ; ni fusionné, ni poussé) : `archimetrics review
+- **AM-4b fait, validé par l'auteur et fusionné dans `main`** le 2026-11-24 (avance rapide depuis `lot/AM-4b`, non
+  poussé) : `archimetrics review
   --contexte fichier`. Au cumul de 3 passages à chaud (`71fbe0e3`), **D-035 (a) tenu** : défauts 6/15, sains 15/15, faux
   0/6, ≈ 30 min le banc. Détail : « Rappel de la revue (AM-4b) » ci-dessous. `npm test` : **73 tests verts** ; `check
   --root .` : 0 violation nouvelle, 37 tolérées. Contexte par défaut de la revue : **D-036** (proposée) dans
@@ -329,3 +330,5 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
   banc), filtre de preuve sur les « \n » littéraux (consigne `revue-am4b-1`), fichiers après le changement dans le banc
   (`780dd51`). Mesures : `71fbe0e3` tient D-035 (a) (6/15, 15/15, 0/6) ; `1880f419` (diff) non. `npm test` 73/73 ;
   `check` : 0 violation nouvelle, 37 tolérées. D-036 proposée. Ni push ni fusion : à valider par l'auteur.
+- **2026-11-24** — AM-4b validé par l'auteur ; `lot/AM-4b` fusionné dans `main` par avance rapide (73 tests verts) ; rien de
+  poussé ; `v1` inchangée. D-036 reste proposée.
