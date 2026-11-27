@@ -23,20 +23,28 @@ function functionSig(sf, fn, name) {
   return `${asy}function${fn.asteriskToken ? '*' : ''} ${name ?? ''}${callSig(sf, fn)}`
 }
 
+const flag = (m, k, word) => (has(m, k) ? word : '')
+const isFn = (n) => !!n && (ts.isArrowFunction(n) || ts.isFunctionExpression(n))
+
+function propertySig(sf, m, st) {
+  if (isFn(m.initializer)) return `${st}${memberName(m)}${callSig(sf, m.initializer)}`
+  const type = m.type ? ': ' + oneLine(m.type.getText(sf)) : ''
+  return `${st}${flag(m, K.ReadonlyKeyword, 'readonly ')}${memberName(m)}${m.questionToken ? '?' : ''}${type}`
+}
+
+// Le genre d'un membre de classe → sa signature (`st` : « static » ou rien).
+const MEMBERS = [
+  [ts.isConstructorDeclaration, (sf, m) => 'constructor' + callSig(sf, m)],
+  [ts.isMethodDeclaration, (sf, m, st) => `${st}${flag(m, K.AsyncKeyword, 'async ')}${m.asteriskToken ? '*' : ''}${memberName(m)}${callSig(sf, m)}`],
+  [ts.isGetAccessorDeclaration, (sf, m, st) => `${st}get ${memberName(m)}${callSig(sf, m)}`],
+  [ts.isSetAccessorDeclaration, (sf, m, st) => `${st}set ${memberName(m)}${callSig(sf, m)}`],
+  [ts.isPropertyDeclaration, propertySig],
+  [ts.isIndexSignatureDeclaration, (sf, m) => oneLine(m.getText(sf))],
+]
+
 function memberSig(sf, m) {
-  const st = has(m, K.StaticKeyword) ? 'static ' : ''
-  if (ts.isConstructorDeclaration(m)) return 'constructor' + callSig(sf, m)
-  if (ts.isMethodDeclaration(m)) return `${st}${has(m, K.AsyncKeyword) ? 'async ' : ''}${m.asteriskToken ? '*' : ''}${memberName(m)}${callSig(sf, m)}`
-  if (ts.isGetAccessorDeclaration(m)) return `${st}get ${memberName(m)}${callSig(sf, m)}`
-  if (ts.isSetAccessorDeclaration(m)) return `${st}set ${memberName(m)}${callSig(sf, m)}`
-  if (ts.isPropertyDeclaration(m)) {
-    const ro = has(m, K.ReadonlyKeyword) ? 'readonly ' : ''
-    const fn = m.initializer && (ts.isArrowFunction(m.initializer) || ts.isFunctionExpression(m.initializer)) ? m.initializer : null
-    if (fn) return `${st}${memberName(m)}${callSig(sf, fn)}`
-    return `${st}${ro}${memberName(m)}${m.questionToken ? '?' : ''}${m.type ? ': ' + oneLine(m.type.getText(sf)) : ''}`
-  }
-  if (ts.isIndexSignatureDeclaration(m)) return oneLine(m.getText(sf))
-  return null
+  const entry = MEMBERS.find(([is]) => is(m))
+  return entry ? entry[1](sf, m, flag(m, K.StaticKeyword, 'static ')) : null
 }
 
 function classSig(sf, c, name) {
@@ -91,28 +99,81 @@ function docsOf(sf, node, stmt) {
   return { jsdoc, comment, start }
 }
 
-// Une déclaration de premier niveau → [{ name, kind, signature, node }] (une par nom déclaré).
+function variables(sf, stmt) {
+  const flags = stmt.declarationList.flags
+  const kw = flags & ts.NodeFlags.Const ? 'const' : flags & ts.NodeFlags.Let ? 'let' : 'var'
+  const out = []
+  for (const d of stmt.declarationList.declarations) {
+    const names = ts.isIdentifier(d.name) ? [d.name.text] : (d.name.elements ?? []).filter((e) => e.name && ts.isIdentifier(e.name)).map((e) => e.name.text)
+    const sig = variableSig(sf, kw, d)
+    for (const name of names) out.push({ name, ...sig, node: d })
+  }
+  return out
+}
+
+function typeDecl(kind) {
+  return (sf, stmt) => [{ name: stmt.name.text, kind, signature: stmt.getText(sf).replace(/\r\n/g, '\n').replace(/^export\s+(default\s+)?/, ''), node: stmt }]
+}
+
+// Le genre d'une déclaration de premier niveau → [{ name, kind, signature, node }] (une par nom déclaré).
+const DECLARATIONS = [
+  [ts.isFunctionDeclaration, (sf, s) => [{ name: s.name?.text ?? 'default', kind: 'function', signature: functionSig(sf, s, s.name?.text), node: s }]],
+  [ts.isClassDeclaration, (sf, s) => [{ name: s.name?.text ?? 'default', kind: 'class', signature: classSig(sf, s, s.name?.text), node: s }]],
+  [ts.isVariableStatement, variables],
+  [ts.isInterfaceDeclaration, typeDecl('interface')],
+  [ts.isTypeAliasDeclaration, typeDecl('type')],
+  [ts.isEnumDeclaration, typeDecl('enum')],
+]
+
 function declared(sf, stmt) {
-  const isDefault = has(stmt, K.DefaultKeyword)
-  if (ts.isFunctionDeclaration(stmt)) return [{ name: stmt.name?.text ?? 'default', kind: 'function', signature: functionSig(sf, stmt, stmt.name?.text), node: stmt, isDefault }]
-  if (ts.isClassDeclaration(stmt)) return [{ name: stmt.name?.text ?? 'default', kind: 'class', signature: classSig(sf, stmt, stmt.name?.text), node: stmt, isDefault }]
-  if (ts.isVariableStatement(stmt)) {
-    const flags = stmt.declarationList.flags
-    const kw = flags & ts.NodeFlags.Const ? 'const' : flags & ts.NodeFlags.Let ? 'let' : 'var'
-    const out = []
-    for (const d of stmt.declarationList.declarations) {
-      const names = ts.isIdentifier(d.name) ? [d.name.text] : (d.name.elements ?? []).filter((e) => e.name && ts.isIdentifier(e.name)).map((e) => e.name.text)
-      const sig = variableSig(sf, kw, d)
-      for (const name of names) out.push({ name, ...sig, node: d })
+  const entry = DECLARATIONS.find(([is]) => is(stmt))
+  return entry ? entry[1](sf, stmt).map((d) => ({ ...d, isDefault: has(stmt, K.DefaultKeyword) })) : []
+}
+
+// Le collecteur des entrées : une par nom, dans l'ordre ; les surcharges d'une fonction fondues (le corps, en dernier,
+// donne la fin).
+function collector(sf, lineOffset) {
+  const lineOf = (pos) => sf.getLineAndCharacterOfPosition(pos).line + 1 + lineOffset
+  const out = []
+  const byName = new Map()
+  const push = (name, d, stmt, extra = {}) => {
+    const prev = byName.get(name)
+    if (prev?.kind === 'function' && d.kind === 'function') {
+      if (!prev.signature.split('\n').includes(d.signature)) prev.signature += '\n' + d.signature
+      prev.endLine = lineOf(stmt.getEnd() - 1)
+      return
     }
-    return out
+    const { jsdoc, comment, start } = docsOf(sf, d.node ?? stmt, stmt)
+    const e = { name, kind: d.kind, signature: d.signature, jsdoc, comment, line: lineOf(stmt.getStart(sf)), endLine: lineOf(stmt.getEnd() - 1), docLine: lineOf(start), ...extra }
+    byName.set(name, e)
+    out.push(e)
   }
-  if (ts.isInterfaceDeclaration(stmt) || ts.isTypeAliasDeclaration(stmt) || ts.isEnumDeclaration(stmt)) {
-    const kind = ts.isInterfaceDeclaration(stmt) ? 'interface' : ts.isTypeAliasDeclaration(stmt) ? 'type' : 'enum'
-    const text = stmt.getText(sf).replace(/\r\n/g, '\n').replace(/^export\s+(default\s+)?/, '')
-    return [{ name: stmt.name.text, kind, signature: text, node: stmt, isDefault }]
+  return { out, push }
+}
+
+function reexports(stmt, from, push) {
+  const clause = stmt.exportClause
+  const pick = (name, sig) => push(name, { kind: 'reexport', signature: sig }, stmt, { from })
+  if (!clause) return pick('*', `export * from '${from}'`)
+  if (ts.isNamespaceExport(clause)) return pick(clause.name.text, `export * as ${clause.name.text} from '${from}'`)
+  for (const el of clause.elements) pick(el.name.text, `export { ${el.propertyName ? el.propertyName.text + ' as ' : ''}${el.name.text} } from '${from}'`)
+}
+
+function exportDeclaration(sf, stmt, locals, push) {
+  const from = stmt.moduleSpecifier && ts.isStringLiteral(stmt.moduleSpecifier) ? stmt.moduleSpecifier.text : null
+  if (from) return reexports(stmt, from, push)
+  if (!stmt.exportClause || !ts.isNamedExports(stmt.exportClause)) return
+  for (const el of stmt.exportClause.elements) {
+    const local = locals.get((el.propertyName ?? el.name).text)
+    if (local) push(el.name.text, local, local.stmt)
+    else push(el.name.text, { kind: 'reexport', signature: `export { ${oneLine(el.getText(sf))} }` }, stmt)
   }
-  return []
+}
+
+function exportAssignment(sf, stmt, locals, push) {
+  const local = ts.isIdentifier(stmt.expression) ? locals.get(stmt.expression.text) : null
+  if (local) return push('default', local, local.stmt)
+  push('default', { kind: 'default', signature: `export ${stmt.isExportEquals ? '= ' : 'default '}${initializerText(sf, stmt.expression)}` }, stmt)
 }
 
 /**
@@ -123,47 +184,13 @@ function declared(sf, stmt) {
  * @param {number} [lineOffset]
  */
 export function exportSignatures(sf, lineOffset = 0) {
-  const lineOf = (pos) => sf.getLineAndCharacterOfPosition(pos).line + 1 + lineOffset
   const locals = new Map()
   for (const stmt of sf.statements) for (const d of declared(sf, stmt)) if (!locals.has(d.name)) locals.set(d.name, { ...d, stmt })
-  const out = []
-  const byName = new Map()
-  const push = (name, d, stmt, extra = {}) => {
-    const prev = byName.get(name)
-    if (prev && prev.kind === 'function' && d.kind === 'function') {
-      // Surcharge : la signature s'ajoute ; le corps (la dernière) donne la fin.
-      if (!prev.signature.split('\n').includes(d.signature)) prev.signature += '\n' + d.signature
-      prev.endLine = lineOf(stmt.getEnd() - 1)
-      return
-    }
-    const { jsdoc, comment, start } = docsOf(sf, d.node ?? stmt, stmt)
-    const e = { name, kind: d.kind, signature: d.signature, jsdoc, comment, line: lineOf(stmt.getStart(sf)), endLine: lineOf(stmt.getEnd() - 1), docLine: lineOf(start), ...extra }
-    byName.set(name, e)
-    out.push(e)
-  }
+  const { out, push } = collector(sf, lineOffset)
   for (const stmt of sf.statements) {
-    if (ts.isExportDeclaration(stmt)) {
-      const from = stmt.moduleSpecifier && ts.isStringLiteral(stmt.moduleSpecifier) ? stmt.moduleSpecifier.text : null
-      const clause = stmt.exportClause
-      if (from) {
-        const pick = (name, sig) => push(name, { kind: 'reexport', signature: sig }, stmt, { from })
-        if (!clause) pick('*', `export * from '${from}'`)
-        else if (ts.isNamespaceExport(clause)) pick(clause.name.text, `export * as ${clause.name.text} from '${from}'`)
-        else for (const el of clause.elements) pick(el.name.text, `export { ${el.propertyName ? el.propertyName.text + ' as ' : ''}${el.name.text} } from '${from}'`)
-      } else if (clause && ts.isNamedExports(clause)) {
-        for (const el of clause.elements) {
-          const local = locals.get((el.propertyName ?? el.name).text)
-          if (local) push(el.name.text, local, local.stmt)
-          else push(el.name.text, { kind: 'reexport', signature: `export { ${oneLine(el.getText(sf))} }` }, stmt)
-        }
-      }
-    } else if (ts.isExportAssignment(stmt)) {
-      const local = ts.isIdentifier(stmt.expression) ? locals.get(stmt.expression.text) : null
-      if (local) push('default', local, local.stmt)
-      else push('default', { kind: 'default', signature: `export ${stmt.isExportEquals ? '= ' : 'default '}${initializerText(sf, stmt.expression)}` }, stmt)
-    } else if (has(stmt, K.ExportKeyword)) {
-      for (const d of declared(sf, stmt)) push(d.isDefault ? 'default' : d.name, d, stmt)
-    }
+    if (ts.isExportDeclaration(stmt)) exportDeclaration(sf, stmt, locals, push)
+    else if (ts.isExportAssignment(stmt)) exportAssignment(sf, stmt, locals, push)
+    else if (has(stmt, K.ExportKeyword)) for (const d of declared(sf, stmt)) push(d.isDefault ? 'default' : d.name, d, stmt)
   }
   return out
 }

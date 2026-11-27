@@ -10,31 +10,26 @@ const MAX_ROLE = 200
 const dirOfRel = (rel) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
 const base = (rel) => rel.slice(rel.lastIndexOf('/') + 1)
 
-// Le commentaire d'en-tête (`//`, `/* */`, `#`, ou docstring Python), réduit à sa première phrase.
-export function headerRole(text) {
-  const lines = text.replace(/^#!.*\n/, '').split('\n')
-  const out = []
-  let block = null
-  for (const raw of lines) {
-    const l = raw.trim()
-    if (block) {
-      const endAt = l.indexOf(block)
-      out.push(l.slice(0, endAt >= 0 ? endAt : undefined).replace(/^\*\s?/, ''))
-      if (endAt >= 0) break
-    } else if (l.startsWith('//') || (l.startsWith('#') && !l.startsWith('#!'))) out.push(l.replace(/^(\/\/+|#+)\s?/, ''))
-    else if (l.startsWith('/*') || l.startsWith('"""') || l.startsWith("'''")) {
-      block = l.startsWith('/*') ? '*/' : l.slice(0, 3)
-      const rest = l.slice(block === '*/' ? 2 : 3).replace(/^\*+\s?/, '')
-      const endAt = rest.indexOf(block)
-      out.push(endAt >= 0 ? rest.slice(0, endAt) : rest)
-      if (endAt >= 0) break
-    } else if (l === '' && !out.length) continue
-    else break
+// Le commentaire d'en-tête (`//`, `/* */`, `#`, ou docstring Python) → ses lignes de texte.
+function headerLines(text) {
+  const t = text.replace(/^#!.*\n/, '').trimStart()
+  const block = t.match(/^\/\*+([\s\S]*?)\*\//)
+  if (block) return block[1].split('\n').map((l) => l.trim().replace(/^\*+\s?/, ''))
+  const doc = t.match(/^("""|''')([\s\S]*?)\1/)
+  if (doc) return doc[2].split('\n')
+  const lines = []
+  for (const l of t.split('\n')) {
+    if (!/^\s*(\/\/|#)/.test(l)) break
+    lines.push(l.trim().replace(/^(\/\/+|#+)\s?/, ''))
   }
-  const joined = out.join(' ').replace(/\s+/g, ' ').trim()
+  return lines
+}
+
+// Le rôle d'un fichier : la première phrase de son commentaire d'en-tête (`null` s'il n'en a pas).
+export function headerRole(text) {
+  const joined = headerLines(text).join(' ').replace(/\s+/g, ' ').trim()
   if (!joined) return null
-  const m = joined.match(/^(.+?[.!?])(\s|$)/)
-  const first = m ? m[1] : joined
+  const first = joined.match(/^(.+?[.!?])(\s|$)/)?.[1] ?? joined
   return first.length > MAX_ROLE ? first.slice(0, MAX_ROLE - 1) + '…' : first
 }
 
