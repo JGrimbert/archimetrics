@@ -175,6 +175,62 @@ de sortie est 0 : le diff informe, `check` juge.
 - Un relevé **sans `schemaVersion`** (antérieur à v1, par exemple sur une branche `metriques` déjà publiée) est lu comme
   « pré-v1 », avec un avertissement, s'il a au moins `summary` et `violations` ; sinon, l'erreur le dit.
 
+## Paquet de contexte d'une tâche : `archimetrics contexte`
+
+```
+node bin/archimetrics.mjs contexte src/graph.mjs --root ../mon-projet               # une cible par chemin
+node bin/archimetrics.mjs contexte analyzeScript src/files.mjs#listAll --profondeur 2 --budget 6000
+node bin/archimetrics.mjs contexte src/graph.mjs --json > paquet.json
+```
+
+Le paquet minimal d'une tâche, pour qu'une session parte de lui au lieu d'explorer le dépôt. Lecture seule, sans LLM.
+
+- **Cibles** (une ou plusieurs) : un chemin (relatif à `--root` ou absolu), `fichier#nom`, ou un nom exporté seul. Un nom
+  exporté par plusieurs fichiers (les ré-exports mis à part) est **refusé** : la sortie d'erreur nomme chaque
+  `fichier#nom` candidat, code de sortie 2 (de même pour une cible inconnue). Une cible fichier est rendue **en entier** ;
+  une cible symbole, de sa JSDoc (ou de son commentaire) à la fin de sa déclaration.
+- **Voisins** : les fichiers du projet importés par une cible et ceux qui l'importent (pour une cible symbole, seuls les
+  importeurs de ce symbole ou du module entier), jusqu'à `--profondeur <n>` (1 par défaut), **réduits à leurs exports** :
+  signature (paramètres tels qu'écrits, type de retour quand il est écrit) et JSDoc, ou à défaut le commentaire `//`
+  qui précède l'export. Les fichiers de test n'y figurent pas.
+- **Tests associés** : les fichiers de test qui importent une cible (chemins).
+- **Jetons** : estimation à 4 caractères par jeton, par section (`cibles`, `voisins`, `tests`) et au total.
+- **`--budget <jetons>`** : si le total le dépasse, les voisins les plus lointains sont retirés les premiers (à distance
+  égale, le plus gros d'abord) jusqu'à tenir ; la sortie dit où elle a coupé (distance gardée, voisins retirés). Les
+  cibles ne sont jamais coupées : si elles dépassent seules le budget, la sortie le dit.
+
+Sortie Markdown par défaut. **`--json`** rend un objet `"schemaVersion": "archimetrics.contexte/1"`, stable (aucune
+date, clés et ordre fixes : voisins par distance puis chemin, tests par chemin) :
+
+| Champ | Contenu |
+|---|---|
+| `schemaVersion`, `tool` | `"archimetrics.contexte/1"`, `"archimetrics"` |
+| `profondeur`, `budget` | les options reçues (`budget` : `null` sans budget) |
+| `cibles[]` | `chemin`, `symbole` (`null` pour un fichier), `lignes` (`[début, fin]`), `texte`, `jetons` |
+| `voisins[]` | `chemin`, `distance`, `relation` (`["importé"]`, `["importeur"]` ou les deux), `exports[]` (`nom`, `genre`, `signature`, `jsdoc`, `commentaire`), `jetons` |
+| `tests[]` | `chemin` |
+| `coupe` | `null`, ou `{ budget, retires: [{ chemin, distance, jetons }], profondeurGardee, tenu }` |
+| `jetons` | `{ cibles, voisins, tests, total }` |
+| `avertissements` | analyses en échec parmi les fichiers du paquet |
+
+Sur une cible refusée, `--json` rend `{ schemaVersion, tool, erreurs: [texte] }` (code 2). `genre` vaut `function`,
+`class`, `const`, `let`, `var`, `interface`, `type`, `enum`, `reexport`, `default`, ou `export` (fichier Python ou Vue :
+noms seuls). Même règle de compatibilité que `metrics.json`.
+
+## `CLAUDE.md` généré : `archimetrics claude-md`
+
+```
+node bin/archimetrics.mjs claude-md src/analyze                # imprime le bloc calculé du dossier
+node bin/archimetrics.mjs claude-md src/analyze --ecrire       # le pose dans src/analyze/CLAUDE.md
+```
+
+La partie calculée du `CLAUDE.md` d'un dossier : ses fichiers de code directs, le rôle de chacun (première phrase de son
+commentaire d'en-tête), ses exports, ce qu'il importe (fichiers du projet, paquets) et qui l'importe. Le bloc est posé
+entre `<!-- archimetrics:debut -->` et `<!-- archimetrics:fin -->` ; le texte écrit à la main hors des balises est
+gardé tel quel (sans balises, le bloc est ajouté à la fin). Aucune date : deux passages sur le même code rendent un
+fichier identique. **Sans `--ecrire`, rien n'est écrit.** Le dossier est relatif à `--root` s'il est donné, sinon au
+dossier courant ; la racine est `--root`, sinon le dépôt Git qui contient le dossier.
+
 ## Limites connues
 
 - Complexité cognitive approchée : ni sauts étiquetés ni récursion ; une fonction imbriquée est mesurée à part.

@@ -11,6 +11,10 @@
 //                          dossier temporaire) et l'arbre de travail ou une autre révision ; le dépôt n'est pas touché
 //   archimetrics review    [<commit>|<a>..<b>] [--root .] [--out d] [--no-llm] [--allow-remote] …   revue d'un changement →
 //                          review.json (archimetrics.review/1) + review.md ; LLM local facultatif (src/review/cli.mjs)
+//   archimetrics contexte  <fichier|symbole|fichier#nom>... [--profondeur n] [--budget jetons] [--json] [--root .]
+//                          paquet de contexte d'une tâche : cibles en entier, voisins en signatures, tests associés, jetons
+//   archimetrics claude-md [<dossier>] [--ecrire] [--root r]   partie calculée du CLAUDE.md du dossier (imprimée ; posée
+//                          entre balises avec --ecrire, texte manuel gardé) (src/contexte/cli.mjs)
 // Options : --no-git (sans points chauds) ; --summary <fichier> (compte rendu Markdown du check, ex. $GITHUB_STEP_SUMMARY).
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -18,6 +22,7 @@ import { resolve } from 'node:path'
 import { compare, readBaseline, writeBaseline } from '../src/baseline.mjs'
 import { loadConfig } from '../src/config.mjs'
 import { runDiff } from '../src/diff-cli.mjs'
+import { runClaudeMd, runContexte } from '../src/contexte/cli.mjs'
 import { runReview } from '../src/review/cli.mjs'
 import { collect } from '../src/metrics/index.mjs'
 import { checkMarkdown } from '../src/report/markdown.mjs'
@@ -39,6 +44,8 @@ if (cmd === 'help' || flag('help')) {
 
 if (cmd === 'diff') process.exit(runDiff(argv, opt))
 if (cmd === 'review') process.exit(await runReview(argv))
+if (cmd === 'contexte') process.exit(runContexte(argv))
+if (cmd === 'claude-md') process.exit(runClaudeMd(argv))
 
 const root = resolve(opt('root', '.'))
 const cfg = loadConfig(root, opt('config'))

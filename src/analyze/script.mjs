@@ -1,13 +1,14 @@
 // L'ANALYSE D'UN SCRIPT JS / TS par l'arbre syntaxique de TypeScript (aucune exécution, aucun typage) :
 // - lignes de code : toute ligne qui porte le début ou la fin d'un nœud, ou l'intérieur d'un littéral (chaîne, gabarit) ;
 //   les commentaires et les lignes vides ne comptent pas ;
-// - imports (statiques, dynamiques, `require`, ré-exports) et exports ;
+// - imports (statiques, dynamiques, `require`, ré-exports) et exports, avec leur signature et leur JSDoc (`signatures`, `src/contexte/signatures.mjs`) ;
 // - fonctions : lignes, paramètres, complexité cyclomatique, complexité cognitive, imbrication ;
 // - classes : décorateurs, membres, injections du constructeur, LCOM4 ; modules Nest (`@Module`) ;
 // - jetons normalisés (identifiants et littéraux fondus) pour la recherche de clones, imports exclus.
 // `lineOffset` décale les numéros de ligne (le script d'un .vue commence plus bas dans le fichier).
 
 import ts from 'typescript'
+import { exportSignatures } from '../contexte/signatures.mjs'
 
 const K = ts.SyntaxKind
 
@@ -347,7 +348,7 @@ export function analyzeScript(text, { ext = '.js', lang = null, lineOffset = 0, 
   }
   visit(sf)
 
-  return { sf, code, tokens, tokenLines, imports, exports: [...exports].filter((e) => !typeExports.has(e)), typeExports: [...typeExports], functions, classes, calls: [...calls], lines: sf.getLineAndCharacterOfPosition(sf.getEnd()).line + 1 }
+  return { sf, code, tokens, tokenLines, imports, exports: [...exports].filter((e) => !typeExports.has(e)), typeExports: [...typeExports], functions, classes, calls: [...calls], signatures: exportSignatures(sf, lineOffset), lines: sf.getLineAndCharacterOfPosition(sf.getEnd()).line + 1 }
 }
 
 // Le nombre de props / emits déclarés (defineProps({…}), defineProps<{…}>(), defineProps([…]), ou l'option `props` / `emits`).
