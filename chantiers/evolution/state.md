@@ -35,6 +35,10 @@
   0/6, ≈ 30 min le banc. Détail : « Rappel de la revue (AM-4b) » ci-dessous. `npm test` : **73 tests verts** ; `check
   --root .` : 0 violation nouvelle, 37 tolérées. Contexte par défaut de la revue : **D-036** (proposée) dans
   `C:\jgr\archi\ARCHI_DECISIONS.md` ; la revue LLM reste un avis non bloquant.
+- **AM-8 fait sur `lot/AM-8`** le 2026-11-27 (ni poussé ni fusionné : à valider par l'auteur) : signatures exportées
+  dans `analyzeScript`, `archimetrics contexte` et `archimetrics claude-md` (D-086 (a), volet ArchiMetrics). Détail et
+  mesure : « Paquet de contexte (AM-8) » ci-dessous. `npm test` : **82 tests verts** ; `diff --base main` : 0 violation
+  ajoutée.
 - **Prochain lot** : AM-5 (restitution, avec D-021) au choix de l'auteur.
 - **DS-4 acceptée** (option (b), 2026-11-23) : relevé de découverte en champ `discovery` de premier niveau et page
   « Découverte » du rapport, avec AM-5 ; reportée : D-021.
@@ -250,6 +254,35 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
 - **Pistes non faites** : modèle plus grand, reportée par l'auteur (4 Go de VRAM, aucun Qwen 8B/14B installé) ; passes
   réservées aux fichiers de code, sans objet sur ce banc (les 10 cas ne touchent que du code).
 
+## Paquet de contexte (AM-8)
+
+- **Signatures** [CONSTAT `src/contexte/signatures.mjs`, appelé par `analyzeScript` : champ `signatures`] : pour chaque
+  export d'un script JS / TS, nom, genre, signature (paramètres tels qu'écrits, type de retour écrit), JSDoc, à défaut le
+  commentaire `//` qui précède, lignes. Fonctions, classes (membres publics), constantes, types, ré-exports, `default` ;
+  surcharges fondues. Champ non sérialisé dans `metrics.json` (le relevé ne garde pas l'analyse par fichier).
+- **`archimetrics contexte`** [CONSTAT `src/contexte/paquet.mjs`, `cli.mjs`, README] : cibles par chemin, `fichier#nom`
+  ou nom seul (refusé et nommé s'il est ambigu, code 2) ; voisins jusqu'à `--profondeur` en signatures ; tests qui
+  importent une cible ; jetons estimés à 4 caractères par jeton ; `--budget` retire d'abord les plus lointains ;
+  `--json` au format `archimetrics.contexte/1` (documenté dans le README, sans schéma publié).
+- **`archimetrics claude-md`** [CONSTAT `src/contexte/claude-md.mjs`] : bloc calculé entre les balises du README
+  (`src/readme.mjs`), texte manuel gardé, aucune date ; rien n'est écrit sans `--ecrire`. Aucun `CLAUDE.md` généré
+  dans un dépôt : geste de l'auteur (fiche AM-8).
+- **Mesure** [CONSTAT, calculée sur `b4b0a22`, profondeur 1, sans budget] : jetons du paquet (`contexte <cible> --json`,
+  champ `jetons`) comparés à la somme des jetons des fichiers lus en entier, cibles et voisins du même paquet (même
+  estimation, 4 caractères par jeton, fins de ligne LF). Calcul : `node <script> <racine> <cibles>`, qui lance
+  `contexte --json` et lit les fichiers nommés dans `cibles` et `voisins`.
+
+  | Cible | Voisins | Cibles | Voisins (signatures) | Tests | Paquet | Fichiers entiers | Paquet / entiers |
+  |---|---|---|---|---|---|---|---|
+  | `src/graph.mjs` | 4 | 1477 | 371 | 6 | 1854 | 5204 | 36 % |
+  | `src/analyze/script.mjs` | 3 | 4226 | 176 | 13 | 4415 | 8184 | 54 % |
+  | `src/review/cli.mjs` | 4 | 977 | 311 | 6 | 1294 | 3540 | 37 % |
+
+- [INTERPRÉTATION] Le gain tient aux voisins (environ 8 à 22 fois moins de jetons que lus en entier). La cible, rendue
+  entière, en est le plancher : le paquet de `script.mjs` (gros fichier, peu de voisins) garde 54 %. Une cible symbole
+  (`contexte analyzeScript`) réduit la cible à la déclaration. La mesure ne dit pas si le paquet suffit à une session :
+  cela reste à éprouver à l'usage.
+
 ## Décisions à soumettre
 
 - **D-036** (proposée, `C:\jgr\archi\ARCHI_DECISIONS.md`) : contexte par défaut d'`archimetrics review`
@@ -332,3 +365,7 @@ une sortie hors dépôt ; `git status --porcelain --branch` de scribe, CC et jgr
   `check` : 0 violation nouvelle, 37 tolérées. D-036 proposée. Ni push ni fusion : à valider par l'auteur.
 - **2026-11-24** — AM-4b validé par l'auteur ; `lot/AM-4b` fusionné dans `main` par avance rapide (73 tests verts) ; rien de
   poussé ; `v1` inchangée. D-036 reste proposée.
+- **2026-11-27** — AM-8 sur `lot/AM-8` (depuis `main`, `a97a48a`) : `src/contexte/` (`signatures`, `model`, `paquet`,
+  `claude-md`, `cli`), `analyzeScript.signatures`, sous-commandes `contexte` et `claude-md`, README, `test/contexte.test.mjs`.
+  Mesure sur 3 cibles : paquet à 36 %, 54 % et 37 % des fichiers lus en entier. `npm test` 82/82 ; `diff --base main` :
+  0 violation ajoutée. Ni push ni fusion : à valider par l'auteur.
